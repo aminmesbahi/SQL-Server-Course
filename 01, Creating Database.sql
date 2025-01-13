@@ -121,4 +121,37 @@ GO
 EXEC sp_addextendedproperty @name=N'ver', @value=N'1.0.0';
 GO
 
+-- Remove a specific file from the database
+ALTER DATABASE TestDB REMOVE FILE TestDB_Data5;
+GO
+
+-- Merge two filegroups (move all files from FG3 to PRIMARY and then remove FG3)
+-- Note: SQL Server does not support direct merging of filegroups. You need to move files manually.
+-- Move file from FG3 to PRIMARY
+ALTER DATABASE TestDB MODIFY FILE (NAME = TestDB_Data5, NEWNAME = 'TestDB_Data5_Primary');
+ALTER DATABASE TestDB MODIFY FILE (NAME = TestDB_Data5_Primary, FILEGROUP = 'PRIMARY');
+GO
+
+-- Remove the empty filegroup FG3
+ALTER DATABASE TestDB REMOVE FILEGROUP FG3;
+GO
+
+-- Get information about files, filegroups, and sizes
+-- Get information about database files
+SELECT name AS FileName, size*8/1024 AS FileSizeMB, max_size*8/1024 AS MaxSizeMB, growth*8/1024 AS GrowthMB
+FROM sys.master_files
+WHERE database_id = DB_ID('TestDB');
+GO
+
+-- Get information about filegroups
+SELECT name AS FileGroupName, type_desc AS FileGroupType, is_default AS IsDefault
+FROM sys.filegroups
+WHERE database_id = DB_ID('TestDB');
+GO
+
+-- Get information about file sizes
+SELECT name AS FileName, size*8/1024 AS FileSizeMB
+FROM sys.master_files
+WHERE database_id = DB_ID('TestDB');
+GO
        
