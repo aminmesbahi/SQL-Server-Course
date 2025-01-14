@@ -24,18 +24,18 @@ GO
 
 
 -- Press Ctrl+M to enable showing actual execution plan
--- check the Execution Plan after exeting this query
+-- check the Execution Plan after executing this query
 SELECT [Name] FROM dbo.Animals
-	WHERE [Name]=N'Cat'
+    WHERE [Name]=N'Cat'
 GO
 
 -- Now you can create an index
 CREATE NONCLUSTERED INDEX IX_Animals_Name ON dbo.Animals([Name]);
 GO
 
--- And check the Exection Plan again, after creting index in previous step
+-- And check the Execution Plan again, after creating index in previous step
 SELECT [Name] FROM dbo.Animals
-	WHERE [Name]=N'Cat'
+    WHERE [Name]=N'Cat'
 GO
 
 -- Adding a new column to this table (Heap, because it doesn't have clustered index)
@@ -44,13 +44,13 @@ GO
 
 -- Checking Execution Plan --> it changed to Table Scan
 SELECT [Name] FROM dbo.Animals
-	WHERE [Name] LIKE N'C%' AND Id > 5;
+    WHERE [Name] LIKE N'C%' AND Id > 5;
 GO
 
--- Crete new index using id column and options
+-- Create new index using id column and options
 CREATE NONCLUSTERED INDEX IX_Animals_Id ON dbo.Animals(Id)
-	WITH (PAD_INDEX = ON, FILLFACTOR=90, DROP_EXISTING=ON, ONLINE=ON, SORT_IN_TEMPDB=ON -- in SQL Server 2019 you can use RESUMABLE=ON
-	);
+    WITH (PAD_INDEX = ON, FILLFACTOR=90, DROP_EXISTING=ON, ONLINE=ON, SORT_IN_TEMPDB=ON -- in SQL Server 2019 you can use RESUMABLE=ON
+    );
 GO
 
 -- Rebuilding Index
@@ -61,16 +61,66 @@ GO
 ALTER INDEX ALL ON dbo.Animals REORGANIZE;
 GO
 
-
--- Get index fragmentaion and free space
+-- Get index fragmentation and free space
 SELECT OBJECT_NAME(ips.OBJECT_ID)
  ,i.NAME
  ,ips.index_id
  ,index_type_desc
- ,avg_fragmentation_in_percent
- ,avg_page_space_used_in_percent
- ,page_count
-FROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('dbo.Animals'), NULL, NULL, NULL) ips
-INNER JOIN sys.indexes i ON (ips.object_id = i.object_id)
- AND (ips.index_id = i.index_id)
-ORDER BY avg_fragmentation_in_percent DESC
+ ,ips.page_count
+ ,ips.record_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('dbo.Animals'), NULL, NULL, 'DETAILED') ips
+JOIN sys.indexes i ON ips.OBJECT_ID = i.OBJECT_ID AND ips.index_id = i.index_id;
+GO
+
+-- Create memory-optimized table
+CREATE TABLE dbo.AnimalsMemoryOptimized
+(
+    Id INT IDENTITY PRIMARY KEY NONCLUSTERED,
+    [Name] NVARCHAR(50) NOT NULL
+) WITH (MEMORY_OPTIMIZED=ON, DURABILITY=SCHEMA_AND_DATA);
+GO
+
+-- Create columnstore index
+CREATE CLUSTERED COLUMNSTORE INDEX IX_AnimalsMemoryOptimized_ColumnStore ON dbo.AnimalsMemoryOptimized;
+GO
+
+-- Create filtered index
+CREATE NONCLUSTERED INDEX IX_AnimalsMemoryOptimized_Filtered ON dbo.AnimalsMemoryOptimized([Name])
+WHERE [Name] LIKE N'C%';
+GO
+
+-- Create table with XML and JSON columns
+CREATE TABLE dbo.AnimalsWithXMLJSON
+(
+    Id INT IDENTITY PRIMARY KEY,
+    AnimalData XML,
+    AnimalInfo NVARCHAR(MAX)
+);
+GO
+
+-- Insert sample data
+INSERT INTO dbo.AnimalsWithXMLJSON (AnimalData, AnimalInfo)
+VALUES
+    (N'<Animal><Name>Cat</Name><Type>Mammal</Type></Animal>', N'{"Name": "Cat", "Type": "Mammal"}'),
+    (N'<Animal><Name>Dog</Name><Type>Mammal</Type></Animal>', N'{"Name": "Dog", "Type": "Mammal"}');
+GO
+
+-- Create XML index
+CREATE PRIMARY XML INDEX IX_AnimalsWithXMLJSON_AnimalData ON dbo.AnimalsWithXMLJSON(AnimalData);
+GO
+
+-- Create JSON index
+CREATE NONCLUSTERED INDEX IX_AnimalsWithXMLJSON_AnimalInfo ON dbo.AnimalsWithXMLJSON(AnimalInfo)
+    WITH (PAD_INDEX = ON, FILLFACTOR=90, DROP_EXISTING=ON, ONLINE=ON, SORT_IN_TEMPDB=ON);
+GO
+
+-- Check number of pages and records for each index
+SELECT OBJECT_NAME(ips.OBJECT_ID)
+ ,i.NAME
+ ,ips.index_id
+ ,index_type_desc
+ ,ips.page_count
+ ,ips.record_count
+FROM sys.dm_db_index_physical_stats(DB_ID(), OBJECT_ID('dbo.AnimalsWithXMLJSON'), NULL, NULL, 'DETAILED') ips
+JOIN sys.indexes i ON ips.OBJECT_ID = i.OBJECT_ID AND ips.index_id = i.index_id;
+GO

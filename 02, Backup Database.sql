@@ -20,7 +20,7 @@ GO
 EXEC sp_addumpdevice  @devtype = N'disk', @logicalname = N'MyBackups', @physicalname = N'C:\DB\Backup\MyBackups.bak'
 GO
 
--- Backup database to backeup device
+-- Backup database to backup device
 BACKUP DATABASE TestDB TO DISK='MyBackups'
 GO
 
@@ -36,5 +36,10 @@ GO
 BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB.bak' MIRROR TO DISK=N'c:\db\backup\TestDB2.bak' WITH FORMAT;
 GO
 
+-- Backup database with compression and verify
+BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB_Compressed.bak' WITH COMPRESSION, VERIFYONLY;
+GO
 
-
+-- Backup database with continue on error
+BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB_ContinueOnError.bak' WITH CONTINUE_AFTER_ERROR;
+GO
