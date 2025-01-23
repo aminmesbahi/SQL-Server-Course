@@ -44,11 +44,6 @@ GO
 SELECT JSON_OBJECT('Customer' VALUE 'John Doe', 'OrderID' VALUE 1) AS OrderObject;
 GO
 
--- Construct a JSON object from an aggregation of SQL data
-SELECT JSON_OBJECTAGG(OrderID, OrderDetails) AS OrdersObject
-FROM dbo.Orders;
-GO
-
 -- Test whether a specified SQL/JSON path exists in the input JSON string
 SELECT OrderID, JSON_PATH_EXISTS(OrderDetails, '$.Items[0].Product') AS PathExists
 FROM dbo.Orders;
@@ -64,8 +59,12 @@ SELECT OrderID, JSON_VALUE(OrderDetails, '$.Customer') AS CustomerName
 FROM dbo.Orders;
 GO
 
--- Parse JSON text and return objects and properties as rows and columns
-SELECT OrderID, Item.value('$.Product', 'NVARCHAR(100)') AS Product, Item.value('$.Quantity', 'INT') AS Quantity
-FROM dbo.Orders
-CROSS APPLY OPENJSON(OrderDetails, '$.Items') WITH (Product NVARCHAR(100), Quantity INT) AS Item;
+-- Combining multiple JSON functions
+SELECT 
+    OrderID,
+    ISJSON(OrderDetails) AS IsValidJSON,
+    JSON_PATH_EXISTS(OrderDetails, '$.Items[0].Product') AS PathExists,
+    JSON_OBJECT('OrderID' VALUE OrderID, 'Customer' VALUE JSON_VALUE(OrderDetails, '$.Customer')) AS OrderObject,
+    JSON_ARRAY(JSON_VALUE(OrderDetails, '$.Items[0].Product'), JSON_VALUE(OrderDetails, '$.Items[1].Product')) AS ProductsArray
+FROM dbo.Orders;
 GO
