@@ -1,45 +1,130 @@
--------------------------------------
--- 2: Backup database
--------------------------------------
+-- ===============================
+-- 2: Backup Database
+-- ===============================
 
--- Minimal database backup
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB.bak'
+-- 2.1 Minimal Database Backup
+BACKUP DATABASE TestDB TO DISK = N'C:\db\backup\TestDB.bak';
 GO
 
--- Backup database with more options
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB.bak' WITH COMPRESSION, STATS = 5, NAME = N'Last backup before 2.0'
-, EXPIREDATE = '01-01-2020', RETAINDAYS = 10
-, DESCRIPTION=N'This backup made by me on 01-01-2019 9:00AM before version 2.0.0';
+-- 2.2 Full Backup with Additional Options
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB.bak' 
+WITH 
+    COMPRESSION,                -- Compress the backup to save disk space
+    STATS = 5,                  -- Display progress every 5% completed
+    NAME = N'Full Backup Before Version 2.0', -- Logical name of the backup
+    EXPIREDATE = '2025-12-31',  -- Prevent overwriting before this date
+    RETAINDAYS = 10,            -- Prevent overwriting for 10 days
+    DESCRIPTION = N'Backup taken on 2025-01-27 before deploying version 2.0.';
 GO
 
--- Viewing content of a backup file
-RESTORE HEADERONLY FROM DISK = 'c:\db\backup\TestDB.bak'
+-- 2.3 Differential Backup
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB_Differential.bak' 
+WITH DIFFERENTIAL, COMPRESSION, STATS = 5;
 GO
 
--- Create new backup device
-EXEC sp_addumpdevice  @devtype = N'disk', @logicalname = N'MyBackups', @physicalname = N'C:\DB\Backup\MyBackups.bak'
+-- 2.4 Transaction Log Backup
+BACKUP LOG TestDB 
+TO DISK = N'C:\db\backup\TestDB_Log.bak' 
+WITH NO_TRUNCATE, STATS = 5;
 GO
 
--- Backup database to backup device
-BACKUP DATABASE TestDB TO DISK='MyBackups'
+-- 2.5 File and Filegroup Backup
+BACKUP DATABASE TestDB 
+FILE = 'TestDB_Data' 
+TO DISK = N'C:\db\backup\TestDB_File.bak' 
+WITH COMPRESSION, STATS = 5;
 GO
 
--- Viewing content of a backup device
-RESTORE HEADERONLY FROM DISK ='MyBackups'
+BACKUP DATABASE TestDB 
+FILEGROUP = 'PRIMARY' 
+TO DISK = N'C:\db\backup\TestDB_FileGroup.bak' 
+WITH COMPRESSION, STATS = 5;
 GO
 
--- Backup one database on multiple files (WITH FORMAT is necessary when one or more files created with one-file backup)
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB.bak', DISK= N'c:\db\backup\TestDB2.bak', DISK = N'c:\db\backup\TestDB3.bak' WITH FORMAT;
+-- 2.6 Backup to a Backup Device
+EXEC sp_addumpdevice 
+    @devtype = N'disk', 
+    @logicalname = N'MyBackups', 
+    @physicalname = N'C:\db\backup\MyBackups.bak';
 GO
 
--- Mirror Backup (Backup database to multiple equivalent files [max 4 mirror files with same media types (Disk or Tape)])
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB.bak' MIRROR TO DISK=N'c:\db\backup\TestDB2.bak' WITH FORMAT;
+BACKUP DATABASE TestDB TO MyBackups 
+WITH COMPRESSION, STATS = 5;
 GO
 
--- Backup database with compression and verify
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB_Compressed.bak' WITH COMPRESSION, VERIFYONLY;
+-- 2.7 Backup to Multiple Files
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB1.bak', 
+   DISK = N'C:\db\backup\TestDB2.bak', 
+   DISK = N'C:\db\backup\TestDB3.bak' 
+WITH FORMAT, COMPRESSION, STATS = 5;
 GO
 
--- Backup database with continue on error
-BACKUP DATABASE TestDB TO DISK=N'c:\db\backup\TestDB_ContinueOnError.bak' WITH CONTINUE_AFTER_ERROR;
+-- 2.8 Mirror Backup
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB.bak' 
+MIRROR TO DISK = N'C:\db\backup\TestDB_Mirror.bak' 
+WITH FORMAT, COMPRESSION, STATS = 5;
+GO
+
+-- 2.9 Encrypted Backup
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB_Encrypted.bak' 
+WITH 
+    ENCRYPTION 
+    (
+        ALGORITHM = AES_256, 
+        SERVER CERTIFICATE = BackupCertificate
+    ),
+    COMPRESSION, STATS = 5;
+GO
+
+-- 2.10 Verify Backup Integrity
+RESTORE VERIFYONLY 
+FROM DISK = N'C:\db\backup\TestDB.bak';
+GO
+
+-- 2.11 Viewing Backup File Content
+RESTORE HEADERONLY 
+FROM DISK = N'C:\db\backup\TestDB.bak';
+GO
+
+RESTORE FILELISTONLY 
+FROM DISK = N'C:\db\backup\TestDB.bak';
+GO
+
+-- 2.12 Backup with Continue on Error
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB_ContinueOnError.bak' 
+WITH CONTINUE_AFTER_ERROR, STATS = 5;
+GO
+
+-- ===============================
+-- 3: Additional Backup Options
+-- ===============================
+
+-- 3.1 Copy-Only Backup (Does not affect the sequence of backups)
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB_CopyOnly.bak' 
+WITH COPY_ONLY, COMPRESSION, STATS = 5;
+GO
+
+-- 3.2 Backup Compression Settings at the Server Level
+EXEC sp_configure 'backup compression default', 1; -- 1 = Enable, 0 = Disable
+RECONFIGURE;
+GO
+
+-- 3.3 Backup with Checksum
+BACKUP DATABASE TestDB 
+TO DISK = N'C:\db\backup\TestDB_Checksum.bak' 
+WITH CHECKSUM, STATS = 5;
+GO
+
+-- 3.4 Partial Backup (Back up specific filegroups)
+BACKUP DATABASE TestDB 
+READ_WRITE_FILEGROUPS 
+TO DISK = N'C:\db\backup\TestDB_Partial.bak' 
+WITH COMPRESSION, STATS = 5;
 GO
