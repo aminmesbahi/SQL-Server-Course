@@ -1,41 +1,47 @@
--------------------------------------
+-- ===============================
 -- 5: Stored Procedures
--------------------------------------
+-- ===============================
 
 USE TestDB;
 GO
 
--- Simple stored procedure
+-- 5.1 Simple Stored Procedure
 CREATE PROCEDURE GetAnimalByName
     @Name NVARCHAR(60)
 AS
 BEGIN
+    SET NOCOUNT ON; -- Improves performance by suppressing the DONE_IN_PROC messages.
     SELECT [Name]
     FROM dbo.Animals
     WHERE [Name] = @Name;
 END;
 GO
 
--- Complex stored procedure with multiple parameters and error handling
+-- 5.2 Complex Stored Procedure with Error Handling
 CREATE PROCEDURE AddAnimal
     @Name NVARCHAR(60),
     @Type NVARCHAR(60),
     @Age INT
 AS
 BEGIN
+    SET NOCOUNT ON;
     BEGIN TRY
         INSERT INTO dbo.Animals ([Name], [Type], [Age])
         VALUES (@Name, @Type, @Age);
     END TRY
     BEGIN CATCH
+        -- Return detailed error information
         SELECT 
             ERROR_NUMBER() AS ErrorNumber,
+            ERROR_SEVERITY() AS ErrorSeverity,
+            ERROR_STATE() AS ErrorState,
+            ERROR_LINE() AS ErrorLine,
             ERROR_MESSAGE() AS ErrorMessage;
     END CATCH;
 END;
 GO
 
--- Stored procedure with Table-Valued Parameter (TVP)
+-- 5.3 Stored Procedure with Table-Valued Parameter (TVP)
 CREATE TYPE AnimalTableType AS TABLE
 (
     [Name] NVARCHAR(60),
@@ -48,13 +54,14 @@ CREATE PROCEDURE AddAnimals
     @Animals AnimalTableType READONLY
 AS
 BEGIN
+    SET NOCOUNT ON;
     INSERT INTO dbo.Animals ([Name], [Type], [Age])
     SELECT [Name], [Type], [Age]
     FROM @Animals;
 END;
 GO
 
--- Native stored procedure
+-- 5.4 Native Stored Procedure
 CREATE PROCEDURE GetAnimalsByType
     @Type NVARCHAR(60)
 WITH NATIVE_COMPILATION, SCHEMABINDING
@@ -70,72 +77,59 @@ BEGIN ATOMIC WITH
 END;
 GO
 
--- Stored procedure with output parameter
+-- 5.5 Stored Procedure with Output Parameter
 CREATE PROCEDURE GetAnimalCountByType
     @Type NVARCHAR(60),
     @Count INT OUTPUT
 AS
 BEGIN
+    SET NOCOUNT ON;
     SELECT @Count = COUNT(*)
     FROM dbo.Animals
     WHERE [Type] = @Type;
 END;
 GO
 
--- Stored procedure with XML parameter
+-- 5.6 Stored Procedure with XML Parameter
 CREATE PROCEDURE AddAnimalFromXML
     @AnimalData XML
 AS
 BEGIN
+    SET NOCOUNT ON;
+
     DECLARE @Name NVARCHAR(60), @Type NVARCHAR(60), @Age INT;
-    
+
     SET @Name = @AnimalData.value('(/Animal/Name)[1]', 'NVARCHAR(60)');
     SET @Type = @AnimalData.value('(/Animal/Type)[1]', 'NVARCHAR(60)');
     SET @Age = @AnimalData.value('(/Animal/Age)[1]', 'INT');
-    
+
     INSERT INTO dbo.Animals ([Name], [Type], [Age])
     VALUES (@Name, @Type, @Age);
 END;
 GO
 
--- Stored procedure with JSON parameter
+-- 5.7 Stored Procedure with JSON Parameter
 CREATE PROCEDURE AddAnimalFromJSON
     @AnimalData NVARCHAR(MAX)
 AS
 BEGIN
+    SET NOCOUNT ON;
+
     DECLARE @Name NVARCHAR(60), @Type NVARCHAR(60), @Age INT;
-    
+
     SET @Name = JSON_VALUE(@AnimalData, '$.Name');
     SET @Type = JSON_VALUE(@AnimalData, '$.Type');
     SET @Age = JSON_VALUE(@AnimalData, '$.Age');
-    
+
     INSERT INTO dbo.Animals ([Name], [Type], [Age])
     VALUES (@Name, @Type, @Age);
 END;
 GO
 
--- Stored procedure with transaction
+-- 5.8 Stored Procedure with Transactions and Error Handling
 CREATE PROCEDURE TransferAnimal
     @AnimalId INT,
     @NewType NVARCHAR(60)
 AS
 BEGIN
-    BEGIN TRANSACTION;
-    BEGIN TRY
-        UPDATE dbo.Animals
-        SET [Type] = @NewType
-        WHERE Id = @AnimalId;
-        
-        -- Simulate some other operations
-        -- ...
-        
-        COMMIT TRANSACTION;
-    END TRY
-    BEGIN CATCH
-        ROLLBACK TRANSACTION;
-        SELECT 
-            ERROR_NUMBER() AS ErrorNumber,
-            ERROR_MESSAGE() AS ErrorMessage;
-    END CATCH;
-END;
-GO
+    SET NOCOUNT ON;
