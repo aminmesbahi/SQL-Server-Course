@@ -242,3 +242,77 @@ WHERE object_id = OBJECT_ID('YourTableName');
 
 
 
+-- Finding missing indexes in a database
+SELECT TOP 50
+    DB_NAME(dm_mid.database_id) AS DatabaseName,
+    SCHEMA_NAME(obj.schema_id) AS SchemaName,
+    OBJECT_NAME(dm_mid.object_id, dm_mid.database_id) AS TableName,
+    dm_migs.unique_compiles AS CompileCount,
+    dm_migs.user_seeks + dm_migs.user_scans + dm_migs.system_seeks + dm_migs.system_scans AS TotalOperations,
+    dm_migs.avg_total_user_cost * dm_migs.avg_user_impact AS ImprovementMeasure,
+    dm_migs.avg_total_user_cost AS AvgQueryCost,
+    dm_migs.avg_user_impact AS AvgPctGain,
+    FORMAT(dm_migs.last_user_seek, 'yyyy-MM-dd HH:mm:ss') AS LastUserSeek,
+    FORMAT(dm_migs.last_user_scan, 'yyyy-MM-dd HH:mm:ss') AS LastUserScan,
+    dm_mid.equality_columns AS EqualityColumns,
+    dm_mid.inequality_columns AS InequalityColumns,
+    dm_mid.included_columns AS IncludedColumns,
+    CONCAT(
+        'CREATE NONCLUSTERED INDEX [IX_', 
+        OBJECT_NAME(dm_mid.object_id, dm_mid.database_id), 
+        '_',
+        FORMAT(GETDATE(), 'yyyyMMdd'),  -- Date-based suffix for new indexes
+        CASE WHEN dm_mid.equality_columns IS NOT NULL 
+            THEN REPLACE(REPLACE(LEFT(dm_mid.equality_columns, 50), '[', ''), ', ', '_') 
+            ELSE '' END,
+        CASE WHEN dm_mid.inequality_columns IS NOT NULL 
+            THEN '_' + REPLACE(REPLACE(LEFT(dm_mid.inequality_columns, 50), '[', ''), ', ', '_') 
+            ELSE '' END,
+        '] ON ', 
+        dm_mid.statement,
+        ' (', 
+        COALESCE(dm_mid.equality_columns + ', ', ''),
+        COALESCE(dm_mid.inequality_columns, ''),
+        ')',
+        CASE WHEN dm_mid.included_columns IS NOT NULL 
+            THEN ' INCLUDE (' + dm_mid.included_columns + ')' 
+            ELSE '' END,
+        ' WITH (ONLINE = ON, DATA_COMPRESSION = PAGE, FILLFACTOR = 90);'
+    ) AS CreateStatement,
+    CONCAT(
+        'Estimated Size: ~', 
+        (COUNT(DISTINCT c.column_id) * 8) +  -- Basic size estimation heuristic
+        (SUM(CASE WHEN typ.name IN ('nvarchar', 'nchar') THEN 2 ELSE 1 END * c.max_length)) 
+        , ' bytes') AS SizeEstimate
+FROM sys.dm_db_missing_index_groups dm_mig
+INNER JOIN sys.dm_db_missing_index_group_stats dm_migs
+    ON dm_migs.group_handle = dm_mig.index_group_handle
+INNER JOIN sys.dm_db_missing_index_details dm_mid
+    ON dm_mig.index_handle = dm_mid.index_handle
+LEFT JOIN sys.objects obj
+    ON dm_mid.object_id = obj.object_id
+LEFT JOIN sys.columns c
+    ON dm_mid.object_id = c.object_id
+LEFT JOIN sys.types typ
+    ON c.system_type_id = typ.system_type_id
+WHERE dm_mid.database_id = DB_ID()
+    AND dm_migs.avg_total_user_cost * dm_migs.avg_user_impact * (dm_migs.user_seeks + dm_migs.user_scans) > 10  -- Filter minor impacts
+    AND dm_migs.last_user_seek > DATEADD(DAY, -30, GETDATE())  -- Only recent activity
+GROUP BY
+    dm_mid.database_id,
+    obj.schema_id,
+    dm_mid.object_id,
+    dm_migs.unique_compiles,
+    dm_migs.user_seeks,
+    dm_migs.user_scans,
+    dm_migs.system_seeks,
+    dm_migs.system_scans,
+    dm_migs.avg_total_user_cost,
+    dm_migs.avg_user_impact,
+    dm_migs.last_user_seek,
+    dm_migs.last_user_scan,
+    dm_mid.equality_columns,
+    dm_mid.inequality_columns,
+    dm_mid.included_columns,
+    dm_mid.statement
+ORDER BY ImprovementMeasure DESC;
