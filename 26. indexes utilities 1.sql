@@ -316,3 +316,74 @@ GROUP BY
     dm_mid.included_columns,
     dm_mid.statement
 ORDER BY ImprovementMeasure DESC;
+
+
+
+-- Unused indexes in a database
+SELECT TOP 50
+    QUOTENAME(SCHEMA_NAME(o.schema_id)) + '.' + QUOTENAME(o.name) AS QualifiedTableName,
+    i.name AS IndexName,
+    i.type_desc AS IndexType,
+    ps.row_count AS TableRows,
+    (ps.reserved_page_count * 8) / 1024.0 AS IndexSizeMB,
+    COALESCE(dm_ius.user_seeks, 0) + 
+    COALESCE(dm_ius.user_scans, 0) + 
+    COALESCE(dm_ius.user_lookups, 0) AS TotalReads,
+    COALESCE(dm_ius.user_updates, 0) AS TotalWrites,
+    FORMAT(GREATEST(dm_ius.last_user_seek, dm_ius.last_user_scan, dm_ius.last_user_lookup), 
+          'yyyy-MM-dd HH:mm:ss') AS LastUsedDate,
+    FORMAT(i.create_date, 'yyyy-MM-dd HH:mm:ss') AS IndexCreatedDate,
+    FORMAT(i.modify_date, 'yyyy-MM-dd HH:mm:ss') AS IndexModifiedDate,
+    CONCAT_WS(', ',
+        CASE WHEN i.is_unique = 1 THEN 'UNIQUE' END,
+        CASE WHEN i.has_filter = 1 THEN 'FILTERED' END,
+        CASE WHEN i.is_hypothetical = 1 THEN 'HYPOTHETICAL' END
+    ) AS IndexProperties,
+    CONCAT(
+        'DROP INDEX ', QUOTENAME(i.name), 
+        ' ON ', QUOTENAME(SCHEMA_NAME(o.schema_id)), '.', QUOTENAME(o.name),
+        CASE WHEN EXISTS (SELECT 1 FROM sys.data_spaces ds 
+                         WHERE ds.data_space_id = i.data_space_id 
+                         AND ds.type = 'FX')
+            THEN ' WITH (ONLINE = ON)' 
+            ELSE '' 
+        END,
+        ';'
+    ) AS DropStatement,
+    (ps.reserved_page_count * 8 * 1024) AS EstimatedSpaceBytes,
+    p.data_compression_desc AS CompressionType,
+    stat.rowmodctr AS RowModifications,
+    (COALESCE(dm_ius.user_seeks, 0) * 1.0) / NULLIF(COALESCE(dm_ius.user_updates, 0), 0) 
+        AS ReadWriteRatio
+FROM sys.indexes i
+LEFT JOIN sys.dm_db_index_usage_stats dm_ius 
+    ON i.object_id = dm_ius.object_id 
+    AND i.index_id = dm_ius.index_id 
+    AND dm_ius.database_id = DB_ID()
+INNER JOIN sys.objects o 
+    ON i.object_id = o.object_id
+INNER JOIN sys.dm_db_partition_stats ps 
+    ON i.object_id = ps.object_id 
+    AND i.index_id = ps.index_id
+LEFT JOIN sys.partitions p 
+    ON i.object_id = p.object_id 
+    AND i.index_id = p.index_id
+LEFT JOIN sys.sysindexes stat 
+    ON i.object_id = stat.id 
+    AND i.index_id = stat.indid
+WHERE OBJECTPROPERTY(i.object_id, 'IsUserTable') = 1
+    AND i.type_desc = 'NONCLUSTERED'
+    AND i.is_primary_key = 0
+    AND i.is_unique_constraint = 0
+    AND i.is_hypothetical = 0
+    AND (COALESCE(dm_ius.user_seeks, 0) + 
+         COALESCE(dm_ius.user_scans, 0) + 
+         COALESCE(dm_ius.user_lookups, 0)) < 100  -- Threshold for low usage
+    AND (DATEDIFF(DAY, GREATEST(dm_ius.last_user_seek, dm_ius.last_user_scan, 
+                              dm_ius.last_user_lookup), GETDATE()) > 30 
+        OR GREATEST(dm_ius.last_user_seek, dm_ius.last_user_scan, 
+                  dm_ius.last_user_lookup) IS NULL)
+ORDER BY 
+    EstimatedSpaceBytes DESC,
+    TotalReads ASC,
+    TotalWrites DESC;
