@@ -112,6 +112,42 @@ GO
 -- COMMIT TRANSACTION;
 -- GO
 
+-- Enable MSDTC (Microsoft Distributed Transaction Coordinator) on your server
+
+-- Example of a distributed transaction
+BEGIN DISTRIBUTED TRANSACTION;
+
+-- Perform operations on the first database
+USE Database1;
+INSERT INTO Table1 (Column1) VALUES ('Value1');
+
+-- Perform operations on the second database
+USE Database2;
+INSERT INTO Table2 (Column2) VALUES ('Value2');
+
+-- Commit the distributed transaction
+COMMIT TRANSACTION;
+
+
+-- Example of Nested Transactions
+BEGIN TRANSACTION;
+
+-- Perform some operations
+INSERT INTO YourTable (Column1) VALUES ('Value1');
+
+-- Begin a nested transaction
+BEGIN TRANSACTION NestedTransaction;
+
+-- Perform more operations
+INSERT INTO YourTable (Column1) VALUES ('Value2');
+
+-- Commit the nested transaction
+COMMIT TRANSACTION NestedTransaction;
+
+-- Commit the outer transaction
+COMMIT TRANSACTION;
+
+
 -- Cleanup the sample table
 DROP TABLE dbo.Accounts;
 GO
