@@ -44,5 +44,5 @@ This repository contains various SQL scripts and examples for learning SQL Serve
 38. [JSON_Advanced.sql](38_JSON_Advanced.sql) - Advanced examples of working with JSON data.
 39. [Isolation_Levels.sql](38_Isolation_Levels.sql) - Advanced examples of Isolation Levels.
 40. [Graph_Database.sql](40_Graph_Database.sql) - Graph Database features exmaples.
-
+41. [Temporal_Tables.sql](41_Temporal_tables.sql) - Temporal Tables examples.
 ### New samples and scripts will be added soon.
