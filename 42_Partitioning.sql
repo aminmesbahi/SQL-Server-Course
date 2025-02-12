@@ -72,3 +72,63 @@ GO
 SELECT * FROM Sales;
 SELECT * FROM Sales_Staging;
 GO
+
+-- Split a partition
+ALTER PARTITION FUNCTION MyPartitionFunction()
+SPLIT RANGE (3500);
+GO
+
+-- Merge partitions
+ALTER PARTITION FUNCTION MyPartitionFunction()
+MERGE RANGE (3000);
+GO
+
+
+-- Create a partitioned index
+CREATE INDEX IX_Sales_SaleDate
+ON Sales(SaleDate)
+ON MyPartitionScheme(SaleID);
+GO
+
+-- Rebuild a partitioned index
+ALTER INDEX IX_Sales_SaleDate
+ON Sales
+REBUILD PARTITION = ALL;
+GO
+
+
+-- Create an archive table with the same structure as the partitioned table
+CREATE TABLE Sales_Archive
+(
+    SaleID INT PRIMARY KEY,
+    SaleDate DATE,
+    Amount DECIMAL(10, 2)
+) ON [PRIMARY];
+GO
+
+-- Switch old data to the archive table
+ALTER TABLE Sales
+SWITCH PARTITION 1 TO Sales_Archive;
+GO
+
+-- Verify the switch
+SELECT * FROM Sales;
+SELECT * FROM Sales_Archive;
+GO
+
+
+-- Drop the partitioned table
+DROP TABLE Sales;
+GO
+
+-- Drop the partition scheme
+DROP PARTITION SCHEME MyPartitionScheme;
+GO
+
+-- Drop the partition function
+DROP PARTITION FUNCTION MyPartitionFunction;
+GO
+
+-- Drop the database
+DROP DATABASE PartitionDB;
+GO
