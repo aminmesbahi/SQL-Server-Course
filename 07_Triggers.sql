@@ -1,11 +1,26 @@
--------------------------------------
--- 7: Triggers
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Triggers Tutorial
+ * Description: This script demonstrates various types of triggers,
+ *              including DML (AFTER, INSTEAD OF) and DDL triggers,
+ *              along with advanced examples using JSON and SQL Server
+ *              2022 features.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database.
+*/
 USE TestDB;
 GO
 
--- Simple DML trigger for INSERT
+-------------------------------------------------
+-- Region: 1. Simple DML Triggers
+-------------------------------------------------
+/*
+  1.1 AFTER INSERT Trigger: Notifies when a new animal is added.
+*/
 CREATE TRIGGER trgAfterInsertAnimals
 ON dbo.Animals
 AFTER INSERT
@@ -16,7 +31,9 @@ BEGIN
 END;
 GO
 
--- Simple DML trigger for UPDATE
+/*
+  1.2 AFTER UPDATE Trigger: Notifies when an animal record is updated.
+*/
 CREATE TRIGGER trgAfterUpdateAnimals
 ON dbo.Animals
 AFTER UPDATE
@@ -28,7 +45,9 @@ BEGIN
 END;
 GO
 
--- Simple DML trigger for DELETE
+/*
+  1.3 AFTER DELETE Trigger: Notifies when an animal record is deleted.
+*/
 CREATE TRIGGER trgAfterDeleteAnimals
 ON dbo.Animals
 AFTER DELETE
@@ -39,7 +58,13 @@ BEGIN
 END;
 GO
 
--- Complex DML trigger with error handling
+-------------------------------------------------
+-- Region: 2. Complex DML Trigger with Error Handling
+-------------------------------------------------
+/*
+  2.1 INSTEAD OF INSERT Trigger: Checks for duplicates before insertion.
+  If an animal with the same name exists, an error is raised.
+*/
 CREATE TRIGGER trgBeforeInsertAnimals
 ON dbo.Animals
 INSTEAD OF INSERT
@@ -68,7 +93,12 @@ BEGIN
 END;
 GO
 
--- DDL trigger for CREATE TABLE
+-------------------------------------------------
+-- Region: 3. DDL Triggers for Schema Changes
+-------------------------------------------------
+/*
+  3.1 DDL Trigger for CREATE TABLE events.
+*/
 CREATE TRIGGER trgAfterCreateTable
 ON DATABASE
 FOR CREATE_TABLE
@@ -79,7 +109,9 @@ BEGIN
 END;
 GO
 
--- DDL trigger for ALTER TABLE
+/*
+  3.2 DDL Trigger for ALTER TABLE events.
+*/
 CREATE TRIGGER trgAfterAlterTable
 ON DATABASE
 FOR ALTER_TABLE
@@ -90,7 +122,9 @@ BEGIN
 END;
 GO
 
--- DDL trigger for DROP TABLE
+/*
+  3.3 DDL Trigger for DROP TABLE events.
+*/
 CREATE TRIGGER trgAfterDropTable
 ON DATABASE
 FOR DROP_TABLE
@@ -101,7 +135,12 @@ BEGIN
 END;
 GO
 
--- Advanced DML trigger using JSON
+-------------------------------------------------
+-- Region: 4. Advanced DML Triggers with JSON and SQL Server 2022 Features
+-------------------------------------------------
+/*
+  4.1 Advanced AFTER INSERT Trigger using JSON: Prints inserted rows as JSON.
+*/
 CREATE TRIGGER trgAfterInsertAnimalsJSON
 ON dbo.Animals
 AFTER INSERT
@@ -113,7 +152,10 @@ BEGIN
 END;
 GO
 
--- Advanced DML trigger using SQL Server 2022 features
+/*
+  4.2 Advanced AFTER INSERT Trigger using SQL Server 2022 features:
+       Uses JSON_OBJECT to format the inserted data.
+*/
 CREATE TRIGGER trgAfterInsertAnimals2022
 ON dbo.Animals
 AFTER INSERT
@@ -122,13 +164,35 @@ BEGIN
     DECLARE @AnimalData NVARCHAR(MAX);
     SELECT @AnimalData = (SELECT * FROM inserted FOR JSON AUTO);
     
-    -- Use new SQL Server 2022 feature: JSON_OBJECT
+    -- Using SQL Server 2022 JSON_OBJECT feature for formatting
     DECLARE @AnimalJson NVARCHAR(MAX) = JSON_OBJECT('AnimalData' VALUE @AnimalData);
     PRINT 'New animal record inserted: ' + @AnimalJson;
 END;
 GO
 
--- Advanced DDL trigger for auditing
+-------------------------------------------------
+-- Region: 5. Advanced DDL Trigger for Auditing Schema Changes
+-------------------------------------------------
+/*
+  5.1 Create an audit table to log DDL changes.
+*/
+IF OBJECT_ID(N'dbo.DDLAudit', N'U') IS NOT NULL
+    DROP TABLE dbo.DDLAudit;
+GO
+
+CREATE TABLE dbo.DDLAudit
+(
+    AuditID INT IDENTITY PRIMARY KEY,
+    EventType NVARCHAR(100),
+    ObjectName NVARCHAR(128),
+    EventData XML,
+    EventTime DATETIME
+);
+GO
+
+/*
+  5.2 Advanced DDL Trigger: Audits CREATE_TABLE, ALTER_TABLE, and DROP_TABLE events.
+*/
 CREATE TRIGGER trgAuditDDLChanges
 ON DATABASE
 FOR CREATE_TABLE, ALTER_TABLE, DROP_TABLE
@@ -146,13 +210,6 @@ BEGIN
 END;
 GO
 
--- Create audit table
-CREATE TABLE dbo.DDLAudit
-(
-    AuditID INT IDENTITY PRIMARY KEY,
-    EventType NVARCHAR(100),
-    ObjectName NVARCHAR(128),
-    EventData XML,
-    EventTime DATETIME
-);
-GO
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
