@@ -1,11 +1,29 @@
--- ===============================
--- 6: Functions
--- ===============================
+/**************************************************************
+ * SQL Server 2022 Functions Tutorial
+ * Description: This script demonstrates various function types
+ *              in SQL Server including scalar functions, inline
+ *              and multi-statement table-valued functions, usage 
+ *              of APPLY operator, error handling, JSON parsing, 
+ *              and advanced functions using CASE, STRING_SPLIT, 
+ *              STRING_AGG, and dynamic data masking.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database for function operations.
+*/
 USE TestDB;
 GO
 
--- 6.1 Simple Scalar Function
+-------------------------------------------------
+-- Region: 1. Simple Scalar Function
+-------------------------------------------------
+/*
+  1.1 dbo.GetAnimalType: Returns the type of an animal based on its name.
+  Note: The dbo.Animals table must contain a column named [Type].
+*/
 CREATE FUNCTION dbo.GetAnimalType(@Name NVARCHAR(60))
 RETURNS NVARCHAR(60)
 AS
@@ -18,7 +36,12 @@ BEGIN
 END;
 GO
 
--- 6.2 Inline Table-Valued Function
+-------------------------------------------------
+-- Region: 2. Inline Table-Valued Function
+-------------------------------------------------
+/*
+  2.1 dbo.GetAnimalsByType: Returns a table with animals filtered by type.
+*/
 CREATE FUNCTION dbo.GetAnimalsByType(@Type NVARCHAR(60))
 RETURNS TABLE
 AS
@@ -30,7 +53,13 @@ RETURN
 );
 GO
 
--- 6.3 Multi-Statement Table-Valued Function
+-------------------------------------------------
+-- Region: 3. Multi-Statement Table-Valued Function
+-------------------------------------------------
+/*
+  3.1 dbo.GetAnimalsOlderThan: Returns animals older than the specified age.
+  Note: The dbo.Animals table must contain columns [Name], [Type], and [Age].
+*/
 CREATE FUNCTION dbo.GetAnimalsOlderThan(@Age INT)
 RETURNS @Animals TABLE
 (
@@ -48,7 +77,12 @@ BEGIN
 END;
 GO
 
--- 6.4 Function with APPLY Operator
+-------------------------------------------------
+-- Region: 4. Function with APPLY Operator
+-------------------------------------------------
+/*
+  4.1 dbo.GetAnimalDetails: Returns animal details along with a computed detail string.
+*/
 CREATE FUNCTION dbo.GetAnimalDetails(@Name NVARCHAR(60))
 RETURNS TABLE
 AS
@@ -61,7 +95,12 @@ RETURN
 );
 GO
 
--- 6.5 Advanced Scalar Function with Error Handling
+-------------------------------------------------
+-- Region: 5. Advanced Scalar Function with Error Handling
+-------------------------------------------------
+/*
+  5.1 dbo.SafeDivide: Divides two numbers and returns NULL if division by zero is attempted.
+*/
 CREATE FUNCTION dbo.SafeDivide(@Numerator FLOAT, @Denominator FLOAT)
 RETURNS FLOAT
 AS
@@ -72,7 +111,13 @@ BEGIN
 END;
 GO
 
--- 6.6 Advanced Table-Valued Function Using JSON
+-------------------------------------------------
+-- Region: 6. Advanced Table-Valued Function Using JSON
+-------------------------------------------------
+/*
+  6.1 dbo.GetAnimalsFromJSON: Parses JSON input and returns a table of animal records.
+  Expected JSON format: An array of objects with properties "Name", "Type", and "Age".
+*/
 CREATE FUNCTION dbo.GetAnimalsFromJSON(@AnimalData NVARCHAR(MAX))
 RETURNS @Animals TABLE
 (
@@ -92,7 +137,12 @@ BEGIN
 END;
 GO
 
--- 6.7 Advanced Function Using CASE Expression
+-------------------------------------------------
+-- Region: 7. Advanced Function Using CASE Expression
+-------------------------------------------------
+/*
+  7.1 dbo.GetAnimalAgeCategory: Returns an age category based on the input age.
+*/
 CREATE FUNCTION dbo.GetAnimalAgeCategory(@Age INT)
 RETURNS NVARCHAR(20)
 AS
@@ -107,7 +157,13 @@ BEGIN
 END;
 GO
 
--- 6.8 Advanced Function Using STRING_SPLIT (SQL Server 2016+)
+-------------------------------------------------
+-- Region: 8. Advanced Function Using STRING_SPLIT
+-------------------------------------------------
+/*
+  8.1 dbo.GetAnimalListFromString: Splits a comma-separated list of animal names into a table.
+  Requires SQL Server 2016 or later.
+*/
 CREATE FUNCTION dbo.GetAnimalListFromString(@AnimalList NVARCHAR(MAX))
 RETURNS @Animals TABLE
 (
@@ -116,20 +172,19 @@ RETURNS @Animals TABLE
 AS
 BEGIN
     INSERT INTO @Animals ([Name])
-    SELECT value
+    SELECT LTRIM(RTRIM(value))
     FROM STRING_SPLIT(@AnimalList, ',');
     RETURN;
 END;
 GO
 
--- 6.9 Function Using APPLY Operator
--- Example query using CROSS APPLY with a function
-SELECT a.[Name], a.[Type], a.[Age], d.[Detail]
-FROM dbo.Animals a
-CROSS APPLY dbo.GetAnimalDetails(a.[Name]) d;
-GO
-
--- 6.10 Function Using STRING_AGG (SQL Server 2017+)
+-------------------------------------------------
+-- Region: 9. Function Using STRING_AGG
+-------------------------------------------------
+/*
+  9.1 dbo.GetAnimalNamesByType: Aggregates animal names of a specific type into a single string.
+  Requires SQL Server 2017 or later.
+*/
 CREATE FUNCTION dbo.GetAnimalNamesByType(@Type NVARCHAR(60))
 RETURNS NVARCHAR(MAX)
 AS
@@ -142,7 +197,13 @@ BEGIN
 END;
 GO
 
--- 6.11 Function with Dynamic Data Masking (SQL Server 2022+)
+-------------------------------------------------
+-- Region: 10. Function with Dynamic Data Masking
+-------------------------------------------------
+/*
+  10.1 dbo.MaskAnimalName: Masks an animal name by revealing only the first character.
+  Requires SQL Server 2022 or later.
+*/
 CREATE FUNCTION dbo.MaskAnimalName(@Name NVARCHAR(60))
 RETURNS NVARCHAR(60)
 AS
@@ -155,7 +216,12 @@ BEGIN
 END;
 GO
 
--- 6.12 Example Query with APPLY
+-------------------------------------------------
+-- Region: 11. Example Query Using APPLY with a Function
+-------------------------------------------------
+/*
+  11.1 Example query: Uses CROSS APPLY with dbo.GetAnimalNamesByType to retrieve aggregated names.
+*/
 SELECT 
     a.[Name], 
     a.[Type], 
@@ -164,3 +230,7 @@ SELECT
 FROM dbo.Animals a
 CROSS APPLY (SELECT dbo.GetAnimalNamesByType(a.[Type])) d(AnimalNames);
 GO
+
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
