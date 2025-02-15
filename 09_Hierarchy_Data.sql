@@ -1,11 +1,32 @@
--------------------------------------
--- 9: Hierarchy Data
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Hierarchy Data Tutorial
+ * Description: This script demonstrates working with hierarchical 
+ *              data using the hierarchyid data type in SQL Server. 
+ *              It covers table creation, data insertion, querying,
+ *              updating, deleting, and advanced JSON and SQL Server 2022
+ *              features for hierarchy representation.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database.
+*/
 USE TestDB;
 GO
 
--- Create a table with hierarchyid data type
+-------------------------------------------------
+-- Region: 1. Creating the Hierarchy Table
+-------------------------------------------------
+/*
+  1.1 Create a table using the hierarchyid data type.
+  The computed column OrgLevel is persisted for quick access.
+*/
+IF OBJECT_ID(N'dbo.Organization', N'U') IS NOT NULL
+    DROP TABLE dbo.Organization;
+GO
+
 CREATE TABLE dbo.Organization
 (
     OrgNode hierarchyid PRIMARY KEY,
@@ -15,7 +36,14 @@ CREATE TABLE dbo.Organization
 );
 GO
 
--- Insert sample records
+-------------------------------------------------
+-- Region: 2. Inserting Hierarchy Data
+-------------------------------------------------
+/*
+  2.1 Insert sample records into the Organization table.
+  Note: The hierarchyid::GetDescendant method is used to generate 
+  hierarchical paths.
+*/
 INSERT INTO dbo.Organization (OrgNode, OrgName, Manager)
 VALUES
     (hierarchyid::GetRoot(), 'Company', 'CEO'),
@@ -27,58 +55,128 @@ VALUES
     (hierarchyid::GetRoot().GetDescendant(NULL, hierarchyid::GetRoot().GetDescendant(NULL, NULL)).GetDescendant(NULL, NULL), 'Department B1', 'Manager B1');
 GO
 
--- Query the hierarchy data
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager
+-------------------------------------------------
+-- Region: 3. Querying the Hierarchy Data
+-------------------------------------------------
+/*
+  3.1 Retrieve the hierarchy data, ordering by the OrgNode.
+*/
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager
 FROM dbo.Organization
 ORDER BY OrgNode;
 GO
 
--- Create an index on the hierarchyid column
-CREATE UNIQUE CLUSTERED INDEX IX_Organization_OrgNode ON dbo.Organization(OrgNode);
+-------------------------------------------------
+-- Region: 4. Indexing the Hierarchy Table
+-------------------------------------------------
+/*
+  4.1 Create a unique clustered index on the OrgNode column for better performance.
+*/
+CREATE UNIQUE CLUSTERED INDEX IX_Organization_OrgNode 
+ON dbo.Organization(OrgNode);
 GO
 
--- Modify a record in the hierarchy
+-------------------------------------------------
+-- Region: 5. Modifying and Deleting Hierarchy Data
+-------------------------------------------------
+/*
+  5.1 Update: Modify a record in the hierarchy.
+*/
 UPDATE dbo.Organization
 SET OrgName = 'Division A Updated'
 WHERE OrgNode = hierarchyid::GetRoot().GetDescendant(NULL, NULL);
 GO
 
--- Delete a record from the hierarchy
+/*
+  5.2 Delete: Remove a record from the hierarchy.
+*/
 DELETE FROM dbo.Organization
 WHERE OrgNode = hierarchyid::GetRoot().GetDescendant(NULL, hierarchyid::GetRoot().GetDescendant(NULL, NULL));
 GO
 
--- Query to get all descendants of a specific node
+-------------------------------------------------
+-- Region: 6. Advanced Hierarchy Queries
+-------------------------------------------------
+/*
+  6.1 Get all descendants of a specific node.
+*/
 DECLARE @OrgNode hierarchyid = hierarchyid::GetRoot().GetDescendant(NULL, NULL);
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager
 FROM dbo.Organization
 WHERE OrgNode.IsDescendantOf(@OrgNode) = 1
 ORDER BY OrgNode;
 GO
 
--- Query to get the parent of a specific node
+/*
+  6.2 Get the parent of a specific node.
+*/
 DECLARE @ChildNode hierarchyid = hierarchyid::GetRoot().GetDescendant(NULL, NULL).GetDescendant(NULL, NULL);
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager
 FROM dbo.Organization
 WHERE OrgNode = @ChildNode.GetAncestor(1);
 GO
 
--- Query to get the root node
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager
+/*
+  6.3 Get the root node.
+*/
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager
 FROM dbo.Organization
 WHERE OrgNode = hierarchyid::GetRoot();
 GO
 
--- Advanced query using JSON to represent the hierarchy
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager,
-       JSON_QUERY((SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)) AS OrgJSON
+-------------------------------------------------
+-- Region: 7. Advanced JSON and SQL Server 2022 Hierarchy Queries
+-------------------------------------------------
+/*
+  7.1 Advanced query: Represent hierarchy data as a JSON snippet.
+*/
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager,
+    JSON_QUERY(
+        (SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager 
+         FOR JSON PATH, WITHOUT_ARRAY_WRAPPER)
+    ) AS OrgJSON
 FROM dbo.Organization
 ORDER BY OrgNode;
 GO
 
--- Advanced query using SQL Server 2022 features to get hierarchy as JSON object
-SELECT OrgNode.ToString() AS OrgNode, OrgLevel, OrgName, Manager,
-       JSON_OBJECT('OrgNode' VALUE OrgNode.ToString(), 'OrgLevel' VALUE OrgLevel, 'OrgName' VALUE OrgName, 'Manager' VALUE Manager) AS OrgJSON
+/*
+  7.2 Advanced query using SQL Server 2022 JSON_OBJECT feature.
+*/
+SELECT 
+    OrgNode.ToString() AS OrgNode, 
+    OrgLevel, 
+    OrgName, 
+    Manager,
+    JSON_OBJECT(
+        'OrgNode' VALUE OrgNode.ToString(), 
+        'OrgLevel' VALUE OrgLevel, 
+        'OrgName' VALUE OrgName, 
+        'Manager' VALUE Manager
+    ) AS OrgJSON
 FROM dbo.Organization
 ORDER BY OrgNode;
 GO
+
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
