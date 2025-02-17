@@ -1,134 +1,199 @@
--------------------------------------
--- Rank Functions (Transact-SQL)
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Time Series Tutorial
+ * Description: This script demonstrates various techniques for 
+ *              working with time series data in SQL Server 2022.
+ *              Topics include:
+ *              - Creating a time series table.
+ *              - Inserting sample time series data.
+ *              - Basic queries filtering by date/time.
+ *              - Window functions for running totals, moving averages,
+ *                and differences.
+ *              - Using system-versioned temporal tables for historical
+ *                data analysis.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database.
+*/
 USE TestDB;
 GO
 
--- Create a sample table
-CREATE TABLE dbo.Employees
+-------------------------------------------------
+-- Region: 1. Creating the Time Series Table
+-------------------------------------------------
+/*
+  1.1 Create a basic time series table to store sensor readings.
+  Columns include:
+    - ReadingID: Unique identifier.
+    - ReadingTime: The timestamp of the reading.
+    - SensorID: ID of the sensor.
+    - Value: Numeric measurement.
+*/
+IF OBJECT_ID(N'dbo.TimeSeriesData', N'U') IS NOT NULL
+    DROP TABLE dbo.TimeSeriesData;
+GO
+
+CREATE TABLE dbo.TimeSeriesData
 (
-    EmployeeID INT PRIMARY KEY,
-    EmployeeName NVARCHAR(100),
-    Department NVARCHAR(100),
-    Salary DECIMAL(10, 2)
+    ReadingID INT IDENTITY(1,1) PRIMARY KEY,
+    ReadingTime DATETIME2(0) NOT NULL,
+    SensorID INT NOT NULL,
+    Value DECIMAL(10,2) NOT NULL
 );
 GO
 
--- Insert sample data
-INSERT INTO dbo.Employees (EmployeeID, EmployeeName, Department, Salary)
+-------------------------------------------------
+-- Region: 2. Inserting Sample Time Series Data
+-------------------------------------------------
+/*
+  2.1 Insert sample time series data.
+  For demonstration, we use readings from a single sensor over a period.
+*/
+INSERT INTO dbo.TimeSeriesData (ReadingTime, SensorID, Value)
 VALUES
-    (1, 'Alice', 'HR', 60000.00),
-    (2, 'Bob', 'IT', 80000.00),
-    (3, 'Charlie', 'HR', 70000.00),
-    (4, 'David', 'IT', 90000.00),
-    (5, 'Eve', 'Finance', 75000.00);
+    ('2023-01-01 08:00:00', 1, 10.50),
+    ('2023-01-01 08:05:00', 1, 11.00),
+    ('2023-01-01 08:10:00', 1, 10.75),
+    ('2023-01-01 08:15:00', 1, 11.25),
+    ('2023-01-01 08:20:00', 1, 10.90),
+    ('2023-01-01 08:25:00', 1, 11.10),
+    ('2023-01-01 08:30:00', 1, 11.00),
+    ('2023-01-01 08:35:00', 1, 10.80),
+    ('2023-01-01 08:40:00', 1, 11.20),
+    ('2023-01-01 08:45:00', 1, 11.30);
 GO
 
--- RANK() function
--- Assigns a rank to each row within the partition of a result set
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       RANK() OVER (ORDER BY Salary DESC) AS Rank
-FROM dbo.Employees;
+-------------------------------------------------
+-- Region: 3. Basic Time Series Queries
+-------------------------------------------------
+/*
+  3.1 Retrieve all readings for SensorID = 1 during the morning session.
+*/
+SELECT *
+FROM dbo.TimeSeriesData
+WHERE SensorID = 1
+  AND ReadingTime BETWEEN '2023-01-01 08:00:00' AND '2023-01-01 09:00:00'
+ORDER BY ReadingTime;
 GO
 
--- DENSE_RANK() function
--- Assigns a rank to each row within the partition of a result set, without gaps in rank values
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       DENSE_RANK() OVER (ORDER BY Salary DESC) AS DenseRank
-FROM dbo.Employees;
+-------------------------------------------------
+-- Region: 4. Time Series Analysis Using Window Functions
+-------------------------------------------------
+/*
+  4.1 Running Total: Calculate a running total of the sensor values.
+*/
+SELECT ReadingID, ReadingTime, SensorID, Value,
+       SUM(Value) OVER (ORDER BY ReadingTime ROWS BETWEEN UNBOUNDED PRECEDING AND CURRENT ROW) AS RunningTotal
+FROM dbo.TimeSeriesData
+ORDER BY ReadingTime;
 GO
 
--- NTILE() function
--- Distributes the rows in an ordered partition into a specified number of groups
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       NTILE(3) OVER (ORDER BY Salary DESC) AS NTile
-FROM dbo.Employees;
+/*
+  4.2 Moving Average: Calculate a 3-reading moving average.
+         (Adjust the window frame as needed.)
+*/
+SELECT ReadingID, ReadingTime, SensorID, Value,
+       AVG(Value) OVER (ORDER BY ReadingTime ROWS BETWEEN 1 PRECEDING AND 1 FOLLOWING) AS MovingAvg
+FROM dbo.TimeSeriesData
+ORDER BY ReadingTime;
 GO
 
--- ROW_NUMBER() function
--- Assigns a unique number to each row within the partition of a result set
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       ROW_NUMBER() OVER (ORDER BY Salary DESC) AS RowNum
-FROM dbo.Employees;
+/*
+  4.3 Lag and Lead: Compare each reading with the previous and next readings.
+*/
+SELECT ReadingID, ReadingTime, SensorID, Value,
+       LAG(Value, 1) OVER (ORDER BY ReadingTime) AS PrevValue,
+       LEAD(Value, 1) OVER (ORDER BY ReadingTime) AS NextValue
+FROM dbo.TimeSeriesData
+ORDER BY ReadingTime;
 GO
 
--- RANK() function with PARTITION BY
--- Assigns a rank to each row within the partition of a result set, partitioned by Department
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rank
-FROM dbo.Employees;
+/*
+  4.4 Difference Calculation: Calculate the difference between consecutive readings.
+*/
+SELECT ReadingID, ReadingTime, SensorID, Value,
+       Value - LAG(Value, 1) OVER (ORDER BY ReadingTime) AS ValueDiff
+FROM dbo.TimeSeriesData
+ORDER BY ReadingTime;
 GO
 
--- DENSE_RANK() function with PARTITION BY
--- Assigns a rank to each row within the partition of a result set, partitioned by Department, without gaps in rank values
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS DenseRank
-FROM dbo.Employees;
+-------------------------------------------------
+-- Region: 5. Grouping Time Series Data by Intervals
+-------------------------------------------------
+/*
+  5.1 Group by 15-minute intervals and calculate aggregate metrics.
+  Use DATEADD and DATEDIFF to bucket timestamps.
+*/
+SELECT DATEADD(minute, (DATEDIFF(minute, 0, ReadingTime) / 15) * 15, 0) AS TimeInterval,
+       COUNT(*) AS ReadingCount,
+       AVG(Value) AS AvgValue,
+       MIN(Value) AS MinValue,
+       MAX(Value) AS MaxValue
+FROM dbo.TimeSeriesData
+GROUP BY DATEADD(minute, (DATEDIFF(minute, 0, ReadingTime) / 15) * 15, 0)
+ORDER BY TimeInterval;
 GO
 
--- NTILE() function with PARTITION BY
--- Distributes the rows in an ordered partition into a specified number of groups, partitioned by Department
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       NTILE(2) OVER (PARTITION BY Department ORDER BY Salary DESC) AS NTile
-FROM dbo.Employees;
+-------------------------------------------------
+-- Region: 6. Using System-Versioned Temporal Tables for Time Series History
+-------------------------------------------------
+/*
+  6.1 Create a system-versioned temporal table for time series data.
+  This example uses a new table to track historical changes.
+*/
+IF OBJECT_ID(N'dbo.TemporalTimeSeries', N'U') IS NOT NULL
+    DROP TABLE dbo.TemporalTimeSeries;
 GO
 
--- ROW_NUMBER() function with PARTITION BY
--- Assigns a unique number to each row within the partition of a result set, partitioned by Department
-SELECT EmployeeID, EmployeeName, Department, Salary,
-       ROW_NUMBER() OVER (PARTITION BY Department ORDER BY Salary DESC) AS RowNum
-FROM dbo.Employees;
-GO
-
--- Advanced query using RANK() function with PARTITION BY and filtering
--- Get the top 2 highest salaries in each department
-WITH RankedEmployees AS
+CREATE TABLE dbo.TemporalTimeSeries
 (
-    SELECT EmployeeID, EmployeeName, Department, Salary,
-           RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS Rank
-    FROM dbo.Employees
+    ReadingID INT IDENTITY(1,1) PRIMARY KEY,
+    ReadingTime DATETIME2(0) NOT NULL,
+    SensorID INT NOT NULL,
+    Value DECIMAL(10,2) NOT NULL,
+    ValidFrom DATETIME2 GENERATED ALWAYS AS ROW START NOT NULL,
+    ValidTo   DATETIME2 GENERATED ALWAYS AS ROW END NOT NULL,
+    PERIOD FOR SYSTEM_TIME (ValidFrom, ValidTo)
 )
-SELECT EmployeeID, EmployeeName, Department, Salary, Rank
-FROM RankedEmployees
-WHERE Rank <= 2;
+WITH (SYSTEM_VERSIONING = ON (HISTORY_TABLE = dbo.TemporalTimeSeriesHistory));
 GO
 
--- Advanced query using DENSE_RANK() function with PARTITION BY and filtering
--- Get the top 2 highest salaries in each department without gaps in rank values
-WITH DenseRankedEmployees AS
-(
-    SELECT EmployeeID, EmployeeName, Department, Salary,
-           DENSE_RANK() OVER (PARTITION BY Department ORDER BY Salary DESC) AS DenseRank
-    FROM dbo.Employees
-)
-SELECT EmployeeID, EmployeeName, Department, Salary, DenseRank
-FROM DenseRankedEmployees
-WHERE DenseRank <= 2;
+/*
+  6.2 Insert sample data into the temporal table.
+*/
+INSERT INTO dbo.TemporalTimeSeries (ReadingTime, SensorID, Value)
+VALUES
+    ('2023-01-01 09:00:00', 1, 11.50),
+    ('2023-01-01 09:05:00', 1, 11.60);
 GO
 
--- Advanced query using NTILE() function with PARTITION BY and filtering
--- Divide employees into 2 groups within each department based on salary
-WITH NTileEmployees AS
-(
-    SELECT EmployeeID, EmployeeName, Department, Salary,
-           NTILE(2) OVER (PARTITION BY Department ORDER BY Salary DESC) AS NTile
-    FROM dbo.Employees
-)
-SELECT EmployeeID, EmployeeName, Department, Salary, NTile
-FROM NTileEmployees
-WHERE NTile = 1;
+/*
+  6.3 Update data to generate history records.
+*/
+UPDATE dbo.TemporalTimeSeries
+SET Value = 11.70
+WHERE ReadingID = 1;
 GO
 
--- Advanced query using ROW_NUMBER() function with PARTITION BY and filtering
--- Get the top 2 highest salaries in each department with unique row numbers
-WITH RowNumberedEmployees AS
-(
-    SELECT EmployeeID, EmployeeName, Department, Salary,
-           ROW_NUMBER() OVER (PARTITION BY Department ORDER BY Salary DESC) AS RowNum
-    FROM dbo.Employees
-)
-SELECT EmployeeID, EmployeeName, Department, Salary, RowNum
-FROM RowNumberedEmployees
-WHERE RowNum <= 2;
+/*
+  6.4 Query the current data.
+*/
+SELECT *
+FROM dbo.TemporalTimeSeries
+FOR SYSTEM_TIME AS OF '2023-01-01 09:10:00';
 GO
+
+/*
+  6.5 Query the historical data.
+*/
+SELECT *
+FROM dbo.TemporalTimeSeriesHistory
+ORDER BY ValidFrom;
+GO
+
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
