@@ -1,11 +1,34 @@
--------------------------------------
--- 15: Windowing Functions
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Windowing Functions Tutorial
+ * Description: This script demonstrates various windowing 
+ *              (analytic) functions in SQL Server, including:
+ *              - ROW_NUMBER(), RANK(), DENSE_RANK(), NTILE()
+ *              - LAG(), LEAD(), FIRST_VALUE(), LAST_VALUE()
+ *              - CUME_DIST(), PERCENT_RANK()
+ *              - PERCENTILE_CONT() and PERCENTILE_DISC()
+ *              - Aggregate window functions (SUM, AVG, COUNT, MAX, MIN)
+ *              along with the use of PARTITION BY and ORDER BY.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database.
+*/
 USE TestDB;
 GO
 
--- Create a sample table
+-------------------------------------------------
+-- Region: 1. Creating the Sales Table and Inserting Data
+-------------------------------------------------
+/*
+  1.1 Create a sample table to demonstrate window functions.
+*/
+IF OBJECT_ID(N'dbo.Sales', N'U') IS NOT NULL
+    DROP TABLE dbo.Sales;
+GO
+
 CREATE TABLE dbo.Sales
 (
     SaleID INT PRIMARY KEY,
@@ -15,7 +38,9 @@ CREATE TABLE dbo.Sales
 );
 GO
 
--- Insert sample data
+/*
+  1.2 Insert sample sales data.
+*/
 INSERT INTO dbo.Sales (SaleID, SaleDate, CustomerID, Amount)
 VALUES
     (1, '2023-01-01', 1, 100.00),
@@ -25,121 +50,161 @@ VALUES
     (5, '2023-01-05', 2, 300.00);
 GO
 
--- ROW_NUMBER() function
--- Assigns a unique number to each row within the partition of a result set
+-------------------------------------------------
+-- Region: 2. Ranking Functions
+-------------------------------------------------
+/*
+  2.1 ROW_NUMBER() - Assigns a unique number to each row ordered by SaleDate.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        ROW_NUMBER() OVER (ORDER BY SaleDate) AS RowNum
 FROM dbo.Sales;
 GO
 
--- RANK() function
--- Assigns a rank to each row within the partition of a result set
+/*
+  2.2 RANK() - Assigns a rank to each row, with gaps for ties.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        RANK() OVER (ORDER BY Amount DESC) AS Rank
 FROM dbo.Sales;
 GO
 
--- DENSE_RANK() function
--- Assigns a rank to each row within the partition of a result set, without gaps in rank values
+/*
+  2.3 DENSE_RANK() - Similar to RANK() but without gaps.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        DENSE_RANK() OVER (ORDER BY Amount DESC) AS DenseRank
 FROM dbo.Sales;
 GO
 
--- NTILE() function
--- Distributes the rows in an ordered partition into a specified number of groups
+/*
+  2.4 NTILE() - Distributes rows into a specified number of groups.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        NTILE(3) OVER (ORDER BY Amount DESC) AS NTile
 FROM dbo.Sales;
 GO
 
--- LAG() function
--- Accesses data from a previous row in the same result set without the use of a self-join
+-------------------------------------------------
+-- Region: 3. Navigation Functions
+-------------------------------------------------
+/*
+  3.1 LAG() - Accesses data from the previous row.
+       If no previous row exists, default to 0.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        LAG(Amount, 1, 0) OVER (ORDER BY SaleDate) AS PrevAmount
 FROM dbo.Sales;
 GO
 
--- LEAD() function
--- Accesses data from a subsequent row in the same result set without the use of a self-join
+/*
+  3.2 LEAD() - Accesses data from the next row.
+       If no subsequent row exists, default to 0.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        LEAD(Amount, 1, 0) OVER (ORDER BY SaleDate) AS NextAmount
 FROM dbo.Sales;
 GO
 
--- FIRST_VALUE() function
--- Returns the first value in an ordered set of values
+/*
+  3.3 FIRST_VALUE() - Returns the first value in the window.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        FIRST_VALUE(Amount) OVER (ORDER BY SaleDate) AS FirstAmount
 FROM dbo.Sales;
 GO
 
--- LAST_VALUE() function
--- Returns the last value in an ordered set of values
+/*
+  3.4 LAST_VALUE() - Returns the last value in the window.
+       The window frame must cover all rows.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
-       LAST_VALUE(Amount) OVER (ORDER BY SaleDate ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS LastAmount
+       LAST_VALUE(Amount) OVER (ORDER BY SaleDate 
+                                ROWS BETWEEN UNBOUNDED PRECEDING AND UNBOUNDED FOLLOWING) AS LastAmount
 FROM dbo.Sales;
 GO
 
--- CUME_DIST() function
--- Calculates the cumulative distribution of a value in a set of values
+-------------------------------------------------
+-- Region: 4. Distribution Functions
+-------------------------------------------------
+/*
+  4.1 CUME_DIST() - Cumulative distribution of a value in a set.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        CUME_DIST() OVER (ORDER BY Amount DESC) AS CumeDist
 FROM dbo.Sales;
 GO
 
--- PERCENT_RANK() function
--- Calculates the relative rank of a row within a group of rows
+/*
+  4.2 PERCENT_RANK() - Relative rank of a row within a group.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        PERCENT_RANK() OVER (ORDER BY Amount DESC) AS PercentRank
 FROM dbo.Sales;
 GO
 
--- PERCENTILE_CONT() function
--- Calculates a percentile based on a continuous distribution of the column value
+-------------------------------------------------
+-- Region: 5. Percentile Functions
+-------------------------------------------------
+/*
+  5.1 PERCENTILE_CONT() - Calculates a continuous percentile (e.g., median).
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        PERCENTILE_CONT(0.5) WITHIN GROUP (ORDER BY Amount) OVER () AS MedianAmount
 FROM dbo.Sales;
 GO
 
--- PERCENTILE_DISC() function
--- Calculates a percentile based on a discrete distribution of the column value
+/*
+  5.2 PERCENTILE_DISC() - Calculates a discrete percentile.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        PERCENTILE_DISC(0.5) WITHIN GROUP (ORDER BY Amount) OVER () AS MedianAmount
 FROM dbo.Sales;
 GO
 
--- SUM() function with PARTITION BY
--- Calculates the sum of a set of values within a partition
+-------------------------------------------------
+-- Region: 6. Aggregate Window Functions with PARTITION BY
+-------------------------------------------------
+/*
+  6.1 SUM() - Running total of Amount for each Customer.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        SUM(Amount) OVER (PARTITION BY CustomerID ORDER BY SaleDate) AS RunningTotal
 FROM dbo.Sales;
 GO
 
--- AVG() function with PARTITION BY
--- Calculates the average of a set of values within a partition
+/*
+  6.2 AVG() - Running average of Amount for each Customer.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        AVG(Amount) OVER (PARTITION BY CustomerID ORDER BY SaleDate) AS RunningAvg
 FROM dbo.Sales;
 GO
 
--- COUNT() function with PARTITION BY
--- Calculates the count of a set of values within a partition
+/*
+  6.3 COUNT() - Running count of sales for each Customer.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        COUNT(*) OVER (PARTITION BY CustomerID ORDER BY SaleDate) AS RunningCount
 FROM dbo.Sales;
 GO
 
--- MAX() function with PARTITION BY
--- Calculates the maximum of a set of values within a partition
+/*
+  6.4 MAX() - Running maximum sale amount for each Customer.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        MAX(Amount) OVER (PARTITION BY CustomerID ORDER BY SaleDate) AS RunningMax
 FROM dbo.Sales;
 GO
 
--- MIN() function with PARTITION BY
--- Calculates the minimum of a set of values within a partition
+/*
+  6.5 MIN() - Running minimum sale amount for each Customer.
+*/
 SELECT SaleID, SaleDate, CustomerID, Amount,
        MIN(Amount) OVER (PARTITION BY CustomerID ORDER BY SaleDate) AS RunningMin
 FROM dbo.Sales;
 GO
+
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
