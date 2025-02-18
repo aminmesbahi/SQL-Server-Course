@@ -1,11 +1,34 @@
--------------------------------------
--- Row-Level Security (Transact-SQL)
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Row-Level Security (RLS) Tutorial
+ * Description: This script demonstrates how to implement row-level
+ *              security using a security policy and a predicate
+ *              function in SQL Server. It covers:
+ *              - Creating a sample table and inserting data.
+ *              - Creating a security predicate function.
+ *              - Creating a security policy to filter rows.
+ *              - Testing row-level security using SESSION_CONTEXT.
+ *              - Enabling/disabling and cleaning up the security policy.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure that the target database is being used.
+*/
 USE TestDB;
 GO
 
--- Create a sample table
+-------------------------------------------------
+-- Region: 1. Creating Sample Table and Inserting Data
+-------------------------------------------------
+/*
+  1.1 Create a sample Orders table to demonstrate RLS.
+*/
+IF OBJECT_ID(N'dbo.Orders', N'U') IS NOT NULL
+    DROP TABLE dbo.Orders;
+GO
+
 CREATE TABLE dbo.Orders
 (
     OrderID INT PRIMARY KEY,
@@ -15,7 +38,9 @@ CREATE TABLE dbo.Orders
 );
 GO
 
--- Insert sample data
+/*
+  1.2 Insert sample orders into the Orders table.
+*/
 INSERT INTO dbo.Orders (OrderID, CustomerID, OrderDate, Amount)
 VALUES
     (1, 1, '2023-01-01', 100.00),
@@ -25,69 +50,114 @@ VALUES
     (5, 2, '2023-01-05', 300.00);
 GO
 
--- Create a security policy
--- Step 1: Create a function to filter rows
+-------------------------------------------------
+-- Region: 2. Implementing Row-Level Security
+-------------------------------------------------
+/*
+  2.1 Create a security predicate function.
+       This function filters rows based on the CustomerID value 
+       stored in the SESSION_CONTEXT.
+*/
+IF OBJECT_ID(N'dbo.fn_SecurityPredicate', N'IF') IS NOT NULL
+    DROP FUNCTION dbo.fn_SecurityPredicate;
+GO
+
 CREATE FUNCTION dbo.fn_SecurityPredicate(@CustomerID INT)
 RETURNS TABLE
 WITH SCHEMABINDING
 AS
-RETURN SELECT 1 AS fn_SecurityPredicateResult
-WHERE @CustomerID = CAST(SESSION_CONTEXT(N'CustomerID') AS INT);
+RETURN 
+    SELECT 1 AS fn_SecurityPredicateResult
+    WHERE @CustomerID = CAST(SESSION_CONTEXT(N'CustomerID') AS INT);
 GO
 
--- Step 2: Create a security policy using the function
+/*
+  2.2 Create a security policy using the predicate function.
+       This policy will filter rows in the Orders table.
+*/
+IF EXISTS (SELECT * FROM sys.security_policies WHERE name = 'dbo.OrderSecurityPolicy')
+    DROP SECURITY POLICY dbo.OrderSecurityPolicy;
+GO
+
 CREATE SECURITY POLICY dbo.OrderSecurityPolicy
 ADD FILTER PREDICATE dbo.fn_SecurityPredicate(CustomerID) ON dbo.Orders
 WITH (STATE = ON);
 GO
 
--- Test row-level security
--- Set the SESSION_CONTEXT for CustomerID
+-------------------------------------------------
+-- Region: 3. Testing Row-Level Security
+-------------------------------------------------
+/*
+  3.1 Set SESSION_CONTEXT for CustomerID = 1 and query the Orders table.
+*/
 EXEC sp_set_session_context @key = N'CustomerID', @value = 1;
 GO
 
--- Query the Orders table as CustomerID = 1
 SELECT * FROM dbo.Orders;
 GO
 
--- Change the SESSION_CONTEXT for CustomerID
+/*
+  3.2 Set SESSION_CONTEXT for CustomerID = 2 and query the Orders table.
+*/
 EXEC sp_set_session_context @key = N'CustomerID', @value = 2;
 GO
 
--- Query the Orders table as CustomerID = 2
 SELECT * FROM dbo.Orders;
 GO
 
--- Change the SESSION_CONTEXT for CustomerID
+/*
+  3.3 Set SESSION_CONTEXT for CustomerID = 3 and query the Orders table.
+*/
 EXEC sp_set_session_context @key = N'CustomerID', @value = 3;
 GO
 
--- Query the Orders table as CustomerID = 3
 SELECT * FROM dbo.Orders;
 GO
 
--- Disable the security policy
+-------------------------------------------------
+-- Region: 4. Managing the Security Policy
+-------------------------------------------------
+/*
+  4.1 Disable the security policy.
+*/
 ALTER SECURITY POLICY dbo.OrderSecurityPolicy
 WITH (STATE = OFF);
 GO
 
--- Query the Orders table without security policy
+/*
+  4.2 Query the Orders table without the security policy in effect.
+*/
 SELECT * FROM dbo.Orders;
 GO
 
--- Enable the security policy
+/*
+  4.3 Re-enable the security policy.
+*/
 ALTER SECURITY POLICY dbo.OrderSecurityPolicy
 WITH (STATE = ON);
 GO
 
--- Drop the security policy
+-------------------------------------------------
+-- Region: 5. Cleanup
+-------------------------------------------------
+/*
+  5.1 Drop the security policy.
+*/
 DROP SECURITY POLICY dbo.OrderSecurityPolicy;
 GO
 
--- Drop the security function
+/*
+  5.2 Drop the security predicate function.
+*/
 DROP FUNCTION dbo.fn_SecurityPredicate;
 GO
 
--- Clean up the sample table
+/*
+  5.3 Drop the sample Orders table.
+*/
 DROP TABLE dbo.Orders;
 GO
+
+-------------------------------------------------
+-- Region: End of Script
+-------------------------------------------------
