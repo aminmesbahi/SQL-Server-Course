@@ -1,11 +1,30 @@
--------------------------------------
--- Expressions Tutorial
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 Expressions Tutorial
+ * Description: This script demonstrates various Transact-SQL expressions:
+ *              - CASE expressions (both simple and searched) for data categorization.
+ *              - COALESCE to provide default values and concatenate strings.
+ *              - NULLIF to avoid division by zero and compare values.
+ **************************************************************/
 
+-------------------------------------------------
+-- Region: 0. Initialization
+-------------------------------------------------
+/*
+  Ensure you are using the target database.
+*/
 USE TestDB;
 GO
 
--- Create a sample table for demonstration
+-------------------------------------------------
+-- Region: 1. Creating and Populating Sample Table
+-------------------------------------------------
+/*
+  1.1 Create a sample table for demonstration.
+*/
+IF OBJECT_ID(N'dbo.SampleData', N'U') IS NOT NULL
+    DROP TABLE dbo.SampleData;
+GO
+
 CREATE TABLE dbo.SampleData
 (
     ID INT PRIMARY KEY,
@@ -16,7 +35,9 @@ CREATE TABLE dbo.SampleData
 );
 GO
 
--- Insert sample data
+/*
+  1.2 Insert sample data into the table.
+*/
 INSERT INTO dbo.SampleData (ID, Name, Age, Salary, Department)
 VALUES
     (1, 'Alice', 30, 60000.00, 'HR'),
@@ -26,8 +47,12 @@ VALUES
     (5, 'Eve', 28, NULL, 'HR');
 GO
 
--- CASE Expression
--- Example 1: Simple CASE expression to categorize age groups
+-------------------------------------------------
+-- Region: 2. CASE Expressions
+-------------------------------------------------
+/*
+  2.1 Simple CASE expression to categorize age groups.
+*/
 SELECT 
     Name,
     Age,
@@ -39,7 +64,9 @@ SELECT
 FROM dbo.SampleData;
 GO
 
--- Example 2: Searched CASE expression to handle NULL values in Salary
+/*
+  2.2 Searched CASE expression to handle NULL values in Salary.
+*/
 SELECT 
     Name,
     Salary,
@@ -50,22 +77,32 @@ SELECT
 FROM dbo.SampleData;
 GO
 
--- COALESCE Expression
--- Example 1: Using COALESCE to provide a default value for NULL Salary
+-------------------------------------------------
+-- Region: 3. COALESCE Expressions
+-------------------------------------------------
+/*
+  3.1 Use COALESCE to provide a default value for NULL Salary.
+*/
 SELECT 
     Name,
     COALESCE(Salary, 50000.00) AS Salary
 FROM dbo.SampleData;
 GO
 
--- Example 2: Using COALESCE to concatenate Name and Department with a fallback
+/*
+  3.2 Use COALESCE to concatenate Name and Department with a fallback.
+*/
 SELECT 
     COALESCE(Name, 'Unknown') + ' - ' + COALESCE(Department, 'Unknown') AS EmployeeInfo
 FROM dbo.SampleData;
 GO
 
--- NULLIF Expression
--- Example 1: Using NULLIF to avoid division by zero
+-------------------------------------------------
+-- Region: 4. NULLIF Expressions
+-------------------------------------------------
+/*
+  4.1 Use NULLIF to avoid division by zero when calculating Salary per Year.
+*/
 SELECT 
     Name,
     Salary,
@@ -74,7 +111,9 @@ SELECT
 FROM dbo.SampleData;
 GO
 
--- Example 2: Using NULLIF to compare columns and return NULL if they are equal
+/*
+  4.2 Use NULLIF to compare columns and return NULL if they are equal.
+*/
 SELECT 
     Name,
     Department,
@@ -82,6 +121,15 @@ SELECT
 FROM dbo.SampleData;
 GO
 
--- Cleanup the sample table
+-------------------------------------------------
+-- Region: 5. Cleanup
+-------------------------------------------------
+/*
+  Clean up the sample table.
+*/
 DROP TABLE dbo.SampleData;
 GO
+
+-------------------------------------------------
+-- End of Script
+-------------------------------------------------
