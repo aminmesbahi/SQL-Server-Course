@@ -1,15 +1,44 @@
--------------------------------------
--- FILESTREAM Implementation for SQL Server 2022
--- Includes: Security, Compression, Temporal, and Azure Integration
--------------------------------------
+/**************************************************************
+ * SQL Server 2022 FILESTREAM Implementation Tutorial
+ * Description: This script demonstrates advanced FILESTREAM features 
+ *              in SQL Server 2022, including:
+ *              - Enabling FILESTREAM at the instance level.
+ *              - Creating a modern database with multiple FILESTREAM groups.
+ *              - Creating a temporal table with FILESTREAM and ledger capabilities.
+ *              - Creating a filetable with compression and security.
+ *              - Configuring security roles and granular permissions.
+ *              - Encrypting FILESTREAM data with Always Encrypted integration.
+ *              - A stored procedure for secure file upload.
+ *              - Inserting sample data using modern BULK INSERT via OPENROWSET.
+ *              - Querying FILESTREAM data with temporal and security filters.
+ *              - Managed backup to Azure Blob Storage.
+ *              - Performance monitoring and garbage collection.
+ *              - Azure integration using PolyBase for external data sources.
+ **************************************************************/
 
--- Enable FILESTREAM at instance level (if not already enabled)
+-------------------------------------------------
+-- Region: 0. Instance-Level Configuration
+-------------------------------------------------
+/*
+  Enable FILESTREAM at the instance level if not already enabled.
+*/
 EXEC sp_configure 'filestream_access_level', 2;
 RECONFIGURE;
 GO
 
--- Create modern database with multiple FILESTREAM groups
+-------------------------------------------------
+-- Region: 1. Database and FILESTREAM Filegroups Setup
+-------------------------------------------------
+/*
+  Drop the database if it exists, then create a new database with:
+    - A primary filegroup.
+    - Two FILESTREAM filegroups.
+    - A log file.
+    - FILESTREAM options including non-transacted access and a directory name.
+*/
 DROP DATABASE IF EXISTS FileStreamDB;
+GO
+
 CREATE DATABASE FileStreamDB
 ON PRIMARY (
     NAME = fsdb_primary,
@@ -36,11 +65,22 @@ GO
 USE FileStreamDB;
 GO
 
--- Create security schema for FILESTREAM access
+-------------------------------------------------
+-- Region: 2. Creating FILESTREAM and Temporal Table with Ledger
+-------------------------------------------------
+/*
+  Create a schema for file assets.
+*/
 CREATE SCHEMA FileAssets;
 GO
 
--- Create temporal table with FILESTREAM and ledger features
+/*
+  Create a temporal table with FILESTREAM storage and ledger capabilities.
+  - SYSTEM_VERSIONING is enabled to track history.
+  - FILESTREAM_ON assigns the table to a specific FILESTREAM filegroup.
+  - DATA_COMPRESSION is applied.
+  - A clustered index is created on RecordID.
+*/
 CREATE TABLE FileAssets.Documents
 (
     DocumentID UNIQUEIDENTIFIER ROWGUIDCOL NOT NULL UNIQUE DEFAULT NEWSEQUENTIALID(),
@@ -65,7 +105,13 @@ WITH (
 );
 GO
 
--- Create compression-enabled filetable (2022 enhancement)
+-------------------------------------------------
+-- Region: 3. Creating a Filetable with Enhanced Features
+-------------------------------------------------
+/*
+  Create a filetable for secure file storage with compression enabled.
+  FILETABLE_SECURITY = 'ENABLE' applies built-in security.
+*/
 CREATE TABLE FileAssets.SecureFiles AS FILETABLE
 WITH (
     FILETABLE_DIRECTORY = 'SecureDocuments',
@@ -78,22 +124,44 @@ WITH (
 );
 GO
 
--- Create security roles
+-------------------------------------------------
+-- Region: 4. Security Configuration and Permissions
+-------------------------------------------------
+/*
+  Create security roles for file access.
+*/
 CREATE ROLE FileViewer;
 CREATE ROLE FileManager;
 GO
 
--- Configure granular permissions
+/*
+  Grant granular permissions:
+    - FileViewer: SELECT on Documents.
+    - FileManager: DML permissions on Documents and ALTER rights on FILESTREAM group.
+*/
 GRANT SELECT ON FileAssets.Documents TO FileViewer;
 GRANT INSERT, UPDATE, DELETE ON FileAssets.Documents TO FileManager;
 GRANT ALTER ON FILEGROUP::FileStreamGroup1 TO FileManager;
 GO
 
--- Encrypt FILESTREAM data using Always Encrypted (2022 integration)
+-------------------------------------------------
+-- Region: 5. Encrypting FILESTREAM Data with Always Encrypted
+-------------------------------------------------
+/*
+  Create a COLUMN MASTER KEY integrated with Azure Key Vault.
+  Adjust KEY_PATH to match your Azure Key Vault configuration.
+*/
 CREATE COLUMN MASTER KEY FileCMK
-WITH (KEY_STORE_PROVIDER_NAME = 'AZURE_KEY_VAULT',
-      KEY_PATH = 'https://vault.azure.net/keys/FileCMK/version');
+WITH (
+    KEY_STORE_PROVIDER_NAME = 'AZURE_KEY_VAULT',
+    KEY_PATH = 'https://vault.azure.net/keys/FileCMK/version'
+);
+GO
 
+/*
+  Create a COLUMN ENCRYPTION KEY (placeholder for ENCRYPTED_VALUE).
+  Replace 0x... with the actual encrypted value.
+*/
 CREATE COLUMN ENCRYPTION KEY FileCEK
 WITH VALUES (
     COLUMN_MASTER_KEY = FileCMK,
@@ -102,7 +170,13 @@ WITH VALUES (
 );
 GO
 
--- Stored procedure for secure file upload
+-------------------------------------------------
+-- Region: 6. Stored Procedure for Secure File Upload
+-------------------------------------------------
+/*
+  Create a stored procedure to securely upload a document.
+  Uses EXECUTE AS OWNER for elevated permissions.
+*/
 CREATE PROCEDURE FileAssets.UploadDocument
     @FileName NVARCHAR(255),
     @FileType NVARCHAR(10),
@@ -117,17 +191,22 @@ BEGIN
         INSERT INTO FileAssets.Documents (FileName, FileType, FileContent)
         VALUES (@FileName, @FileType, @Content);
 
-        -- 2022 ERROR_MESSAGE() enhancement
         COMMIT TRANSACTION;
     END TRY
     BEGIN CATCH
         ROLLBACK TRANSACTION;
         THROW;
-    END CATCH
+    END CATCH;
 END;
 GO
 
--- Insert sample data using modern OPENROWSET (2022 BULK INSERT enhancement)
+-------------------------------------------------
+-- Region: 7. Inserting Sample FILESTREAM Data
+-------------------------------------------------
+/*
+  Insert sample data using modern OPENROWSET BULK INSERT enhancements.
+  Adjust the file path as needed.
+*/
 INSERT INTO FileAssets.Documents (FileName, FileType, FileContent)
 SELECT 
     'Manual.pdf',
@@ -136,7 +215,13 @@ SELECT
 FROM OPENROWSET(BULK N'C:\SampleFiles\Sample.pdf', SINGLE_BLOB) AS f;
 GO
 
--- Query FILESTREAM data with temporal and security
+-------------------------------------------------
+-- Region: 8. Querying FILESTREAM Data with Temporal and Security Filters
+-------------------------------------------------
+/*
+  Query the Documents table (with system versioning) along with a filetable.
+  Use a security filter to only retrieve documents with SecurityLevel <= 1 and of type 'PDF'.
+*/
 SELECT 
     d.DocumentID,
     d.FileName,
@@ -151,37 +236,65 @@ WHERE d.SecurityLevel <= 1
 ORDER BY d.FileSize DESC;
 GO
 
--- Backup strategy with FILESTREAM (2022 managed backup)
+-------------------------------------------------
+-- Region: 9. Backup Strategy with FILESTREAM to Azure Blob Storage
+-------------------------------------------------
+/*
+  Backup the FileStreamDB database to Azure Blob Storage.
+  Adjust the URL to your Azure storage endpoint.
+*/
 BACKUP DATABASE FileStreamDB
 TO URL = 'https://storageaccount.blob.core.windows.net/container/FileStreamDB.bak'
 WITH FILESTREAM, COMPRESSION, CHECKSUM;
 GO
 
--- Performance monitoring using DMVs
+-------------------------------------------------
+-- Region: 10. Performance Monitoring and Garbage Collection
+-------------------------------------------------
+/*
+  Query performance details for FILESTREAM files.
+*/
 SELECT 
     fs.database_id,
     fs.name AS file_stream_name,
     fs.physical_name,
-    fs.size * 8/1024 AS SizeMB,
-    fs.space_used * 8/1024 AS UsedMB,
+    fs.size * 8 / 1024 AS SizeMB,
+    fs.space_used * 8 / 1024 AS UsedMB,
     fs.type_desc
 FROM sys.database_files AS fs
 WHERE fs.type = 2;  -- FILESTREAM files
+GO
 
--- Garbage collection management (2022 improved cleanup)
+/*
+  Force FILESTREAM garbage collection (2022 improved cleanup).
+*/
 EXEC sp_filestream_force_garbage_collection @dbname = N'FileStreamDB';
 GO
 
--- Azure integration using PolyBase (2022 enhancement)
+-------------------------------------------------
+-- Region: 11. Azure Integration using PolyBase
+-------------------------------------------------
+/*
+  Create an external data source pointing to Azure Blob Storage.
+  Replace 'storageaccount' and 'container' with your values.
+*/
 CREATE EXTERNAL DATA SOURCE AzureStorage
 WITH (
     LOCATION = 'wasbs://container@storageaccount.blob.core.windows.net',
     CREDENTIAL = AzureStorageCredential
 );
+GO
 
+/*
+  Create an external file format (example: ZipFileFormat).
+*/
 CREATE EXTERNAL FILE FORMAT ZipFileFormat
 WITH (FORMAT_TYPE = DELIMITEDTEXT);
+GO
 
+/*
+  Create an external table to access archived files from Azure Storage.
+*/
 CREATE EXTERNAL TABLE FileAssets.ArchiveFiles
 (
     FileName NVARCHAR(255),
@@ -194,8 +307,18 @@ WITH (
 );
 GO
 
--- Cleanup with modern syntax
-DROP TABLE IF EXISTS FileAssets.Documents;
-DROP DATABASE IF EXISTS FileStreamDB;
-DROP ROLE IF EXISTS FileViewer;
+-------------------------------------------------
+-- Region: 12. Cleanup
+-------------------------------------------------
+/*
+  Clean up security objects and drop the database.
+  Uncomment the following lines if you wish to clean up:
+*/
+-- DROP TABLE IF EXISTS FileAssets.Documents;
+-- DROP DATABASE IF EXISTS FileStreamDB;
+-- DROP ROLE IF EXISTS FileViewer;
 GO
+
+-------------------------------------------------
+-- End of Script
+-------------------------------------------------
