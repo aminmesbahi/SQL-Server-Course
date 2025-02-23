@@ -1,18 +1,31 @@
---------------------------------------------------------------------------------
--- Temporal Tables Tutorial for SQL Server 2022
---------------------------------------------------------------------------------
+/**************************************************************
+ * SQL Server 2022 Temporal Tables Tutorial
+ * Description: This script demonstrates how to create and use 
+ *              system-versioned temporal tables in SQL Server 2022.
+ *              It covers:
+ *              - Creating a temporal table with a history table.
+ *              - Inserting, updating, and deleting data to generate history.
+ *              - Querying current data, full history, and data as of specific times.
+ *              - Disabling and re-enabling system versioning.
+ *              - Cleanup instructions.
+ **************************************************************/
 
-USE TestDB;
-GO
-
--- 1. Drop tables if they already exist (for re-run purposes)
+-------------------------------------------------
+-- Region: 1. Cleanup Existing Tables (for re-run purposes)
+-------------------------------------------------
 IF OBJECT_ID('dbo.EmployeeHistory', 'U') IS NOT NULL  
     DROP TABLE dbo.EmployeeHistory;
 IF OBJECT_ID('dbo.Employee', 'U') IS NOT NULL  
     DROP TABLE dbo.Employee;
 GO
 
--- 2. Create a system-versioned temporal table with a history table.
+-------------------------------------------------
+-- Region: 2. Creating the Temporal Table
+-------------------------------------------------
+/*
+  Create the temporal table with system versioning.
+  The ValidFrom and ValidTo columns are generated automatically.
+*/
 CREATE TABLE dbo.Employee
 (
     EmployeeID INT NOT NULL PRIMARY KEY,
@@ -29,7 +42,12 @@ WITH
 );
 GO
 
--- 3. Insert initial data into the temporal table.
+-------------------------------------------------
+-- Region: 3. Inserting and Modifying Data
+-------------------------------------------------
+/*
+  Insert initial data into the temporal table.
+*/
 INSERT INTO dbo.Employee (EmployeeID, Name, Position, Salary)
 VALUES
     (1, 'Alice', 'Manager', 90000.00),
@@ -37,11 +55,13 @@ VALUES
     (3, 'Charlie', 'Analyst', 68000.00);
 GO
 
--- Wait for a short period
+-- Wait for a short period to ensure different timestamps
 WAITFOR DELAY '00:00:02';
 GO
 
--- 4. Update data: Increase salary for Bob and change his Position.
+/*
+  Update data: Increase Bob's salary and change his Position.
+*/
 UPDATE dbo.Employee
 SET Salary = 80000.00, Position = 'Senior Developer'
 WHERE EmployeeID = 2;
@@ -50,41 +70,52 @@ GO
 WAITFOR DELAY '00:00:02';
 GO
 
--- 5. Another update: Modify Alice's salary.
+/*
+  Another update: Modify Alice's salary.
+*/
 UPDATE dbo.Employee
 SET Salary = 95000.00
 WHERE EmployeeID = 1;
 GO
 
--- 6. Delete an employee (Charlie)
+/*
+  Delete an employee (Charlie) to generate a delete history record.
+*/
 DELETE FROM dbo.Employee
 WHERE EmployeeID = 3;
 GO
 
---------------------------------------------------------------------------------
--- Querying Temporal Data
---------------------------------------------------------------------------------
-
--- Query the current data
+-------------------------------------------------
+-- Region: 4. Querying Temporal Data
+-------------------------------------------------
+/*
+  4.1 Query the current data.
+*/
 SELECT *
 FROM dbo.Employee;
 GO
 
--- Query the full history (current + historical rows)
+/*
+  4.2 Query the full history (current and historical rows).
+*/
 SELECT * 
 FROM dbo.Employee
 FOR SYSTEM_TIME ALL;
 GO
 
--- Query as of a specific point in time 
--- (Replace the datetime value with an appropriate value from your history)
+/*
+  4.3 Query as of a specific point in time.
+      (Replace @AsOfTime with an appropriate value from your history.)
+*/
 DECLARE @AsOfTime DATETIME2 = DATEADD(SECOND, -3, SYSUTCDATETIME());
 SELECT *
 FROM dbo.Employee
 FOR SYSTEM_TIME AS OF @AsOfTime;
 GO
 
--- Query changes between two time points
+/*
+  4.4 Query changes between two time points.
+*/
 DECLARE @StartTime DATETIME2 = DATEADD(SECOND, -10, SYSUTCDATETIME());
 DECLARE @EndTime   DATETIME2 = SYSUTCDATETIME();
 
@@ -93,19 +124,28 @@ FROM dbo.Employee
 FOR SYSTEM_TIME BETWEEN @StartTime AND @EndTime;
 GO
 
---------------------------------------------------------------------------------
--- Disabling System-Versioning (if needed)
---------------------------------------------------------------------------------
--- To disable system-versioning temporarily, run:
--- ALTER TABLE dbo.Employee SET (SYSTEM_VERSIONING = OFF);
--- (After modifications, you can re-enable it using:)
--- ALTER TABLE dbo.Employee SET (SYSTEM_VERSIONING = ON (HISTORY_TABLE = dbo.EmployeeHistory));
+-------------------------------------------------
+-- Region: 5. Disabling System-Versioning (Optional)
+-------------------------------------------------
+/*
+  To temporarily disable system-versioning:
+  ALTER TABLE dbo.Employee SET (SYSTEM_VERSIONING = OFF);
+  
+  After modifications, re-enable using:
+  ALTER TABLE dbo.Employee SET (SYSTEM_VERSIONING = ON (HISTORY_TABLE = dbo.EmployeeHistory));
+*/
 GO
 
---------------------------------------------------------------------------------
--- Cleanup (Optional)
---------------------------------------------------------------------------------
--- Uncomment the following lines to drop the created tables after testing
+-------------------------------------------------
+-- Region: 6. Cleanup (Optional)
+-------------------------------------------------
+/*
+  Uncomment the following lines to drop the tables after testing.
+*/
 -- DROP TABLE dbo.Employee;
 -- DROP TABLE dbo.EmployeeHistory;
 GO
+
+-------------------------------------------------
+-- End of Script
+-------------------------------------------------
