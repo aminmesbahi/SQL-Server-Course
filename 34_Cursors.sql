@@ -1,58 +1,83 @@
--- Example: Declaring and using a cursor in SQL Server 2022
+/**************************************************************
+ * SQL Server 2022 Cursor Tutorial
+ * Description: This script demonstrates various techniques for 
+ *              using cursors in SQL Server, including:
+ *              - Basic forward-only cursors.
+ *              - Scrollable cursors.
+ *              - Updating through cursors.
+ *              - Static and keyset cursors.
+ *              - Parameterized cursors.
+ *              - Cursors with error handling.
+ *              - Nested cursors.
+ *              - Dynamic cursors.
+ **************************************************************/
 
--- Create a sample table
+-------------------------------------------------
+-- Region: 0. Initialization and Sample Data Setup
+-------------------------------------------------
+/*
+  Create a temporary table for cursor demonstration.
+*/
 IF OBJECT_ID('tempdb..#Employees') IS NOT NULL
     DROP TABLE #Employees;
+GO
+
 CREATE TABLE #Employees
 (
     EmployeeID INT,
     FirstName NVARCHAR(50),
     LastName NVARCHAR(50)
 );
+GO
 
--- Insert sample data
 INSERT INTO #Employees (EmployeeID, FirstName, LastName)
-VALUES (1, 'John', 'Doe'),
-       (2, 'Jane', 'Smith'),
-       (3, 'Bob', 'Johnson');
+VALUES 
+    (1, 'John', 'Doe'),
+    (2, 'Jane', 'Smith'),
+    (3, 'Bob', 'Johnson');
+GO
 
--- Declare variables to hold the data
+-------------------------------------------------
+-- Region: 1. Basic Cursor Example
+-------------------------------------------------
+/*
+  Example: Declaring and using a basic forward-only cursor.
+  This cursor iterates over the #Employees table and prints each row.
+*/
 DECLARE @EmployeeID INT, 
         @FirstName NVARCHAR(50), 
         @LastName NVARCHAR(50);
 
--- Declare the cursor
 DECLARE EmployeeCursor CURSOR LOCAL FAST_FORWARD
 FOR
-SELECT EmployeeID, FirstName, LastName FROM #Employees;
+    SELECT EmployeeID, FirstName, LastName FROM #Employees;
 
--- Open the cursor
 OPEN EmployeeCursor;
 
--- Fetch the first row
 FETCH NEXT FROM EmployeeCursor INTO @EmployeeID, @FirstName, @LastName;
 
--- Loop through the rows
 WHILE @@FETCH_STATUS = 0
 BEGIN
     PRINT CONCAT('EmployeeID: ', @EmployeeID, '; Name: ', @FirstName, ' ', @LastName);
-
-    -- Fetch the next row
     FETCH NEXT FROM EmployeeCursor INTO @EmployeeID, @FirstName, @LastName;
 END
 
--- Close and deallocate the cursor
 CLOSE EmployeeCursor;
 DEALLOCATE EmployeeCursor;
+GO
 
-
-
--- Example 1: Basic Forward-Only Cursor
+-------------------------------------------------
+-- Region: 2. Basic Forward-Only Cursor (Example 1)
+-------------------------------------------------
+/*
+  Example 1: Basic forward-only cursor for iterating over a product list.
+  (Assumes a Production.Product table exists.)
+*/
 DECLARE @ProductID INT, @ProductName NVARCHAR(50);
 
 DECLARE product_cursor CURSOR LOCAL FAST_FORWARD
 FOR 
-SELECT ProductID, ProductName FROM Production.Product;
+    SELECT ProductID, ProductName FROM Production.Product;
 
 OPEN product_cursor;
 FETCH NEXT FROM product_cursor INTO @ProductID, @ProductName;
@@ -65,16 +90,23 @@ END
 
 CLOSE product_cursor;
 DEALLOCATE product_cursor;
+GO
 
-
--- Example 2: Scrollable Cursor
+-------------------------------------------------
+-- Region: 3. Scrollable Cursor (Example 2)
+-------------------------------------------------
+/*
+  Example 2: A scrollable cursor that allows navigation to the first, last, 
+  absolute, relative, and prior rows.
+  (Assumes HumanResources.Employee table exists.)
+*/
 DECLARE employee_scroll CURSOR SCROLL
 FOR
-SELECT EmployeeID, FirstName, LastName FROM HumanResources.Employee;
+    SELECT EmployeeID, FirstName, LastName FROM HumanResources.Employee;
 
 OPEN employee_scroll;
 
--- Navigate through records
+-- Navigate through records (demonstration purposes; results not printed)
 FETCH FIRST FROM employee_scroll;
 FETCH LAST FROM employee_scroll;
 FETCH ABSOLUTE 5 FROM employee_scroll;
@@ -83,12 +115,19 @@ FETCH PRIOR FROM employee_scroll;
 
 CLOSE employee_scroll;
 DEALLOCATE employee_scroll;
+GO
 
--- Example 3: Updating Through Cursor
+-------------------------------------------------
+-- Region: 4. Updating Through Cursor (Example 3)
+-------------------------------------------------
+/*
+  Example 3: Using a cursor to update rows.
+  Updates the ListPrice of products from Production.Product if the price is below 100.
+*/
 DECLARE update_cursor CURSOR
 FOR 
-SELECT ProductID, ListPrice FROM Production.Product
-FOR UPDATE OF ListPrice;
+    SELECT ProductID, ListPrice FROM Production.Product
+    FOR UPDATE OF ListPrice;
 
 DECLARE @ProdID INT, @Price MONEY;
 
@@ -103,50 +142,80 @@ BEGIN
         SET ListPrice = @Price * 1.1
         WHERE CURRENT OF update_cursor;
     END
-    
     FETCH NEXT FROM update_cursor INTO @ProdID, @Price;
 END
 
 CLOSE update_cursor;
 DEALLOCATE update_cursor;
+GO
 
--- Example 4: Static Cursor
+-------------------------------------------------
+-- Region: 5. Static Cursor (Example 4)
+-------------------------------------------------
+/*
+  Example 4: A static cursor that remains unaffected by changes in the source table 
+  after it is opened.
+  (Assumes Sales.SalesOrderHeader exists.)
+*/
 DECLARE static_cursor CURSOR STATIC
 FOR
-SELECT * FROM Sales.SalesOrderHeader;
+    SELECT * FROM Sales.SalesOrderHeader;
+-- Cursor operations would go here...
+CLOSE static_cursor;
+DEALLOCATE static_cursor;
+GO
 
--- Changes to source table won't affect cursor after opening
-
--- Example 5: Keyset Cursor
+-------------------------------------------------
+-- Region: 6. Keyset Cursor (Example 5)
+-------------------------------------------------
+/*
+  Example 5: A keyset cursor which maintains membership of rows (keys) even if non-key 
+  columns are updated.
+  (Assumes Sales.Customer exists.)
+*/
 DECLARE keyset_cursor CURSOR KEYSET
 FOR
-SELECT CustomerID, AccountNumber FROM Sales.Customer;
+    SELECT CustomerID, AccountNumber FROM Sales.Customer;
+-- Cursor operations would go here...
+CLOSE keyset_cursor;
+DEALLOCATE keyset_cursor;
+GO
 
--- Maintains membership but allows updates to non-key columns
-
-
-
-
--- Example 6: Parameterized Cursor
+-------------------------------------------------
+-- Region: 7. Parameterized Cursor (Example 6)
+-------------------------------------------------
+/*
+  Example 6: A parameterized cursor filtering by a specific department.
+  (Assumes HumanResources.Employee exists with a DepartmentID column.)
+*/
 DECLARE @DepartmentID INT = 1;
 
 DECLARE dept_cursor CURSOR LOCAL FAST_FORWARD
 FOR 
-SELECT BusinessEntityID, JobTitle FROM HumanResources.Employee
-WHERE DepartmentID = @DepartmentID;
+    SELECT BusinessEntityID, JobTitle FROM HumanResources.Employee
+    WHERE DepartmentID = @DepartmentID;
+-- Cursor operations would go here...
+CLOSE dept_cursor;
+DEALLOCATE dept_cursor;
+GO
 
-
--- Example 7: Cursor with Error Handling
+-------------------------------------------------
+-- Region: 8. Cursor with Error Handling (Example 7)
+-------------------------------------------------
+/*
+  Example 7: A cursor with TRY/CATCH for error handling.
+  Forces an error (division by zero) to demonstrate error capture.
+*/
 BEGIN TRY
     DECLARE error_cursor CURSOR FOR
-    SELECT ProductID FROM Production.Product;
+        SELECT ProductID FROM Production.Product;
 
     OPEN error_cursor;
-    FETCH NEXT FROM error_cursor;
+    FETCH NEXT FROM error_cursor; -- Not fetching into variables for brevity
 
-    -- Force error
+    -- Force an error (division by zero)
     SELECT 1/0;
-
+    
     CLOSE error_cursor;
     DEALLOCATE error_cursor;
 END TRY
@@ -158,14 +227,24 @@ BEGIN CATCH
         CLOSE error_cursor;
         DEALLOCATE error_cursor;
     END
-END CATCH
+END CATCH;
+GO
 
--- Example 8: Nested Cursors
+-------------------------------------------------
+-- Region: 9. Nested Cursors (Example 8)
+-------------------------------------------------
+/*
+  Example 8: Using nested cursors.
+  The outer cursor iterates through departments and the inner cursor iterates 
+  through employees within each department.
+  (Assumes HumanResources.Department and HumanResources.Employee exist, and that 
+  Employee has a DepartmentID column.)
+*/
 DECLARE @DeptID INT, @DeptName NVARCHAR(50);
 DECLARE @EmpID INT, @EmpName NVARCHAR(100);
 
 DECLARE dept_cursor CURSOR FOR
-SELECT DepartmentID, Name FROM HumanResources.Department;
+    SELECT DepartmentID, Name FROM HumanResources.Department;
 
 OPEN dept_cursor;
 FETCH NEXT FROM dept_cursor INTO @DeptID, @DeptName;
@@ -175,9 +254,9 @@ BEGIN
     PRINT 'Department: ' + @DeptName;
     
     DECLARE emp_cursor CURSOR FOR
-    SELECT BusinessEntityID, FirstName + ' ' + LastName 
-    FROM HumanResources.Employee
-    WHERE DepartmentID = @DeptID;
+        SELECT BusinessEntityID, FirstName + ' ' + LastName 
+        FROM HumanResources.Employee
+        WHERE DepartmentID = @DeptID;
     
     OPEN emp_cursor;
     FETCH NEXT FROM emp_cursor INTO @EmpID, @EmpName;
@@ -196,10 +275,27 @@ END
 
 CLOSE dept_cursor;
 DEALLOCATE dept_cursor;
+GO
 
--- Example 9: Dynamic Cursor (Reflects all changes)
+-------------------------------------------------
+-- Region: 10. Dynamic Cursor (Example 9)
+-------------------------------------------------
+/*
+  Example 9: A dynamic cursor that reflects all changes made to the data after it is opened.
+  (Assumes Production.Product exists.)
+*/
 DECLARE dynamic_cursor CURSOR DYNAMIC
 FOR
-SELECT ProductID, Name FROM Production.Product;
+    SELECT ProductID, Name FROM Production.Product;
+    
+-- Operations using the dynamic cursor would go here.
+-- For demonstration, we'll simply open and close the cursor.
+OPEN dynamic_cursor;
+FETCH NEXT FROM dynamic_cursor;
+CLOSE dynamic_cursor;
+DEALLOCATE dynamic_cursor;
+GO
 
--- Will see changes made by other users during iteration
+-------------------------------------------------
+-- End of Script
+-------------------------------------------------
