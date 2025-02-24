@@ -1,24 +1,29 @@
+/**************************************************************
+ * SQL Server 2022: Querying Bad Practices and Optimal Approaches
+ * Description: This script demonstrates 10 common querying bad 
+ *              practices and provides optimal approaches for each.
+ *              The examples cover:
+ *              1. Using SELECT * versus specifying needed columns.
+ *              2. Avoiding non-SARGable queries.
+ *              3. Using JOINs instead of correlated subqueries.
+ *              4. Set-based operations versus row-by-row processing.
+ *              5. Dynamic SQL: String concatenation versus parameterized queries.
+ *              6. Avoiding unnecessary DISTINCT usage.
+ *              7. Using EXISTS rather than COUNT(*) for existence checks.
+ *              8. Preventing implicit data type conversions.
+ *              9. Proper use of NOLOCK hints.
+ *             10. Reducing overuse of scalar UDFs in queries.
+ **************************************************************/
+
+-------------------------------------------------
+-- Region 1: Using SELECT * vs. Specifying Needed Columns
+-------------------------------------------------
 /*
-  Script: QueryingBadPracticesAndOptimalApproaches.sql
-  Description: This script demonstrates 10 common querying bad practices (or mistakes)
-               and provides the correct (optimal) approaches for SQL Server 2022.
-  Note: These examples use simple sample tables and data. Always test scripts in a development
-        or staging environment before applying changes to production.
--------------------------------------------------------------
+  BAD PRACTICE: Using SELECT * retrieves all columns even if only a few are needed.
+  CORRECT APPROACH: List only the required columns.
 */
 
-/*=============================================================================
-  1. Using SELECT * Versus Specifying Needed Columns
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Using SELECT * retrieves all columns even if only a few are needed.
-    - This can lead to unnecessary I/O and maintenance issues when table schemas change.
-    
-  CORRECT APPROACH:
-    - Explicitly list only the columns required by the query.
-=============================================================================*/
-
--- Create sample table: Employees
+-- Setup sample table: Employees
 IF OBJECT_ID('dbo.Employees', 'U') IS NOT NULL 
     DROP TABLE dbo.Employees;
 GO
@@ -40,17 +45,15 @@ GO
 SELECT EmployeeID, FirstName, LastName FROM dbo.Employees;
 GO
 
-/*=============================================================================
-  2. Non-SARGable Queries: Using Functions on Indexed Columns
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Wrapping an indexed column in a function (e.g., YEAR(OrderDate)) prevents index usage.
-    
-  CORRECT APPROACH:
-    - Rewrite the predicate to use range conditions so that the index can be used.
-=============================================================================*/
+-------------------------------------------------
+-- Region 2: Avoiding Non-SARGable Queries
+-------------------------------------------------
+/*
+  BAD PRACTICE: Wrapping an indexed column in a function (e.g., YEAR(OrderDate)) prevents index usage.
+  CORRECT APPROACH: Use range conditions to allow index usage.
+*/
 
--- Create sample table: Orders
+-- Setup sample table: Orders
 IF OBJECT_ID('dbo.Orders', 'U') IS NOT NULL 
     DROP TABLE dbo.Orders;
 GO
@@ -67,22 +70,20 @@ SELECT * FROM dbo.Orders
 WHERE YEAR(OrderDate) = 2020;
 GO
 
--- GOOD: Use range predicates on the column
+-- GOOD: Use range predicates
 SELECT * FROM dbo.Orders
 WHERE OrderDate >= '2020-01-01' AND OrderDate < '2021-01-01';
 GO
 
-/*=============================================================================
-  3. Correlated Subqueries Versus JOINs
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Using a correlated subquery to calculate an aggregate per row can be inefficient.
-    
-  CORRECT APPROACH:
-    - Use a JOIN with GROUP BY to compute aggregates in a set-based manner.
-=============================================================================*/
+-------------------------------------------------
+-- Region 3: Correlated Subqueries vs. JOINs
+-------------------------------------------------
+/*
+  BAD PRACTICE: Using a correlated subquery to compute an aggregate per row.
+  CORRECT APPROACH: Use JOIN with GROUP BY for set-based aggregation.
+*/
 
--- Create sample tables: Products and OrderDetails
+-- Setup sample tables: Products and OrderDetails
 IF OBJECT_ID('dbo.Products', 'U') IS NOT NULL 
     DROP TABLE dbo.Products;
 IF OBJECT_ID('dbo.OrderDetails', 'U') IS NOT NULL 
@@ -102,30 +103,28 @@ CREATE TABLE dbo.OrderDetails (
 );
 GO
 
--- BAD: Correlated subquery to calculate average price for each product
+-- BAD: Correlated subquery for each product
 SELECT ProductID, 
        (SELECT AVG(Price) FROM dbo.OrderDetails OD WHERE OD.ProductID = P.ProductID) AS AvgPrice
 FROM dbo.Products P;
 GO
 
--- GOOD: Use JOIN with GROUP BY for set-based aggregation
+-- GOOD: JOIN with GROUP BY for set-based aggregation
 SELECT P.ProductID, AVG(OD.Price) AS AvgPrice
 FROM dbo.Products P
 JOIN dbo.OrderDetails OD ON P.ProductID = OD.ProductID
 GROUP BY P.ProductID;
 GO
 
-/*=============================================================================
-  4. Row-by-Row Processing Using Cursors Versus Set-Based Operations
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Using cursors to process rows one at a time is much slower than set-based operations.
-    
-  CORRECT APPROACH:
-    - Replace cursor-based logic with a single set-based statement.
-=============================================================================*/
+-------------------------------------------------
+-- Region 4: Row-by-Row Processing vs. Set-Based Operations
+-------------------------------------------------
+/*
+  BAD PRACTICE: Using cursors to update rows one by one.
+  CORRECT APPROACH: Use set-based updates.
+*/
 
--- Create sample table: Inventory
+-- Setup sample table: Inventory
 IF OBJECT_ID('dbo.Inventory', 'U') IS NOT NULL 
     DROP TABLE dbo.Inventory;
 GO
@@ -136,12 +135,11 @@ CREATE TABLE dbo.Inventory (
 );
 GO
 
--- Insert sample data
 INSERT INTO dbo.Inventory (ProductID, Quantity)
 VALUES (1, 100), (2, 200), (3, 300);
 GO
 
--- BAD: Update using a cursor (row-by-row processing)
+-- BAD: Cursor-based update
 DECLARE @ProdID INT, @Qty INT;
 
 DECLARE inventory_cursor CURSOR FOR
@@ -163,7 +161,7 @@ CLOSE inventory_cursor;
 DEALLOCATE inventory_cursor;
 GO
 
--- Reset data for demonstration purposes
+-- Reset data for demonstration
 UPDATE dbo.Inventory
 SET Quantity = CASE ProductID WHEN 1 THEN 100 WHEN 2 THEN 200 WHEN 3 THEN 300 END;
 GO
@@ -174,17 +172,15 @@ SET Quantity = Quantity + 10
 WHERE Quantity < 250;
 GO
 
-/*=============================================================================
-  5. Dynamic SQL: Concatenation Versus Parameterized Queries
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Building dynamic SQL via string concatenation can lead to SQL injection vulnerabilities.
-    
-  CORRECT APPROACH:
-    - Use parameterized dynamic SQL with sp_executesql.
-=============================================================================*/
+-------------------------------------------------
+-- Region 5: Dynamic SQL: Concatenation vs. Parameterized Queries
+-------------------------------------------------
+/*
+  BAD PRACTICE: Building dynamic SQL via string concatenation (vulnerable to SQL injection).
+  CORRECT APPROACH: Use parameterized dynamic SQL with sp_executesql.
+*/
 
--- Create sample table: Users
+-- Setup sample table: Users
 IF OBJECT_ID('dbo.Users', 'U') IS NOT NULL 
     DROP TABLE dbo.Users;
 GO
@@ -196,36 +192,33 @@ CREATE TABLE dbo.Users (
 );
 GO
 
--- Insert sample data
 INSERT INTO dbo.Users (Username, IsActive)
 VALUES ('alice', 1), ('bob', 0), ('charlie', 1);
 GO
 
 DECLARE @UserName NVARCHAR(100) = 'alice';
 
--- BAD: Dynamic SQL built by concatenating strings
+-- BAD: Dynamic SQL via concatenation
 DECLARE @SQLBad NVARCHAR(MAX);
-SET @SQLBad = N'SELECT * FROM dbo.Users WHERE Username = ''' + @UserName + N'''';
+SET @SQLBad = N'SELECT * FROM dbo.Users WHERE Username = ''' + @UserName + N''''; 
 EXEC(@SQLBad);
 GO
 
--- GOOD: Parameterized dynamic SQL using sp_executesql
+-- GOOD: Parameterized dynamic SQL
 DECLARE @SQLGood NVARCHAR(MAX);
 SET @SQLGood = N'SELECT * FROM dbo.Users WHERE Username = @UserNameParam';
 EXEC sp_executesql @SQLGood, N'@UserNameParam NVARCHAR(100)', @UserNameParam = @UserName;
 GO
 
-/*=============================================================================
-  6. Unnecessary Use of DISTINCT Versus Proper JOINs
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Using DISTINCT to eliminate duplicates that result from an improper join.
-    
-  CORRECT APPROACH:
-    - Write explicit JOINs with proper join conditions to avoid duplicates.
-=============================================================================*/
+-------------------------------------------------
+-- Region 6: Unnecessary Use of DISTINCT vs. Proper JOINs
+-------------------------------------------------
+/*
+  BAD PRACTICE: Using DISTINCT to remove duplicates from an improper join.
+  CORRECT APPROACH: Write explicit JOINs with proper join conditions.
+*/
 
--- Create sample tables: Categories and Products
+-- Setup sample tables: Categories and Products
 IF OBJECT_ID('dbo.Categories', 'U') IS NOT NULL 
     DROP TABLE dbo.Categories;
 IF OBJECT_ID('dbo.Products', 'U') IS NOT NULL 
@@ -245,90 +238,81 @@ CREATE TABLE dbo.Products (
 );
 GO
 
--- BAD: Using DISTINCT with an implicit join (old-style join syntax)
+-- BAD: Using DISTINCT with implicit join syntax
 SELECT DISTINCT P.ProductName, C.CategoryName
 FROM dbo.Products P, dbo.Categories C
 WHERE P.CategoryID = C.CategoryID;
 GO
 
--- GOOD: Using an explicit INNER JOIN
+-- GOOD: Using explicit INNER JOIN
 SELECT P.ProductName, C.CategoryName
 FROM dbo.Products P
 INNER JOIN dbo.Categories C ON P.CategoryID = C.CategoryID;
 GO
 
-/*=============================================================================
-  7. Using COUNT(*) to Check for Existence Versus EXISTS
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Checking for the existence of rows by counting them (which scans all matching rows).
-    
-  CORRECT APPROACH:
-    - Use the EXISTS predicate, which stops at the first match.
-=============================================================================*/
+-------------------------------------------------
+-- Region 7: Using COUNT(*) vs. EXISTS for Existence Checks
+-------------------------------------------------
+/*
+  BAD PRACTICE: Using COUNT(*) to check for the existence of rows (scans all rows).
+  CORRECT APPROACH: Use EXISTS, which stops after the first match.
+*/
 
--- BAD: Using COUNT(*) to check if active users exist
+-- BAD: Existence check using COUNT(*)
 IF ((SELECT COUNT(*) FROM dbo.Users WHERE IsActive = 1) > 0)
     PRINT 'Active user exists (using COUNT)';
 GO
 
--- GOOD: Using EXISTS for existence check
+-- GOOD: Existence check using EXISTS
 IF EXISTS (SELECT 1 FROM dbo.Users WHERE IsActive = 1)
     PRINT 'Active user exists (using EXISTS)';
 GO
 
-/*=============================================================================
-  8. Avoiding Implicit Data Type Conversions
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Comparing values of different data types (e.g., an INT column to a VARCHAR literal)
-      can cause implicit conversions that may hinder index usage.
-    
-  CORRECT APPROACH:
-    - Ensure that the compared literals or parameters use the same data type as the column.
-=============================================================================*/
+-------------------------------------------------
+-- Region 8: Avoiding Implicit Data Type Conversions
+-------------------------------------------------
+/*
+  BAD PRACTICE: Comparing values of different data types (e.g., INT vs. VARCHAR) may force conversions.
+  CORRECT APPROACH: Use matching data types in comparisons.
+*/
 
--- BAD: OrderID is INT, but comparing with a VARCHAR literal
+-- BAD: Implicit conversion from VARCHAR to INT
 SELECT * FROM dbo.Orders
-WHERE OrderID = '1';  -- Implicit conversion from VARCHAR to INT may occur
+WHERE OrderID = '1';
 GO
 
--- GOOD: Compare using the correct data type
+-- GOOD: Use the correct data type
 SELECT * FROM dbo.Orders
 WHERE OrderID = 1;
 GO
 
-/*=============================================================================
-  9. Improper Use of NOLOCK Hints
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Overusing the NOLOCK hint can lead to dirty reads and inconsistent results.
-    
-  CORRECT APPROACH:
-    - Use proper isolation levels (e.g., READ COMMITTED SNAPSHOT) or omit NOLOCK when accuracy is critical.
-=============================================================================*/
+-------------------------------------------------
+-- Region 9: Proper Use of NOLOCK Hints
+-------------------------------------------------
+/*
+  BAD PRACTICE: Overusing NOLOCK can lead to dirty reads.
+  CORRECT APPROACH: Use NOLOCK judiciously or rely on appropriate isolation levels.
+*/
 
--- BAD: Using NOLOCK indiscriminately (may return uncommitted data)
+-- BAD: Using NOLOCK indiscriminately
 SELECT * FROM dbo.Orders WITH (NOLOCK)
 WHERE Amount > 50;
 GO
 
--- GOOD: Remove NOLOCK to ensure data consistency (or configure proper isolation levels)
+-- GOOD: Remove NOLOCK for data consistency (or configure proper isolation levels)
 SELECT * FROM dbo.Orders
 WHERE Amount > 50;
 GO
 
-/*=============================================================================
- 10. Overuse of Scalar User-Defined Functions (UDFs) in Queries
-  -----------------------------------------------------------------------------
-  BAD PRACTICE:
-    - Calling scalar UDFs in the SELECT list (or WHERE clause) for every row can cause performance degradation.
-    
-  CORRECT APPROACH:
-    - Inline the logic directly in the query or use computed columns when possible.
-=============================================================================*/
+-------------------------------------------------
+-- Region 10: Overuse of Scalar UDFs in Queries
+-------------------------------------------------
+/*
+  BAD PRACTICE: Calling scalar UDFs for every row can cause performance degradation.
+  CORRECT APPROACH: Inline simple logic or use computed columns.
+*/
 
--- Create a scalar UDF (for demonstration purposes)
+-- Create a scalar UDF (for demonstration)
 IF OBJECT_ID('dbo.ufn_GetFullName', 'FN') IS NOT NULL 
     DROP FUNCTION dbo.ufn_GetFullName;
 GO
@@ -341,7 +325,7 @@ BEGIN
 END;
 GO
 
--- Create sample table: Employees2
+-- Setup sample table: Employees2
 IF OBJECT_ID('dbo.Employees2', 'U') IS NOT NULL 
     DROP TABLE dbo.Employees2;
 GO
@@ -354,7 +338,6 @@ CREATE TABLE dbo.Employees2 (
 );
 GO
 
--- Insert sample data
 INSERT INTO dbo.Employees2 (FirstName, LastName, Department)
 VALUES ('John', 'Doe', 'Sales'),
        ('Jane', 'Smith', 'HR'),
@@ -366,8 +349,11 @@ SELECT EmployeeID, dbo.ufn_GetFullName(FirstName, LastName) AS FullName, Departm
 FROM dbo.Employees2;
 GO
 
--- GOOD: Inline the expression (SQL Server can optimize simple concatenations better)
+-- GOOD: Inline the expression for better performance
 SELECT EmployeeID, FirstName + ' ' + LastName AS FullName, Department
 FROM dbo.Employees2;
 GO
 
+-------------------------------------------------
+-- End of Script
+-------------------------------------------------
