@@ -42,8 +42,18 @@ This repository contains various SQL scripts and examples for learning SQL Serve
 36. [CTE.sql](36_CTE.sql) - Examples of common table expressions.
 37. [Pivot_Unpivot.sql](37_Pivot_Unpivot.sql) - Examples of pivot and unpivot operations.
 38. [JSON_Advanced.sql](38_JSON_Advanced.sql) - Advanced examples of working with JSON data.
-39. [Isolation_Levels.sql](38_Isolation_Levels.sql) - Advanced examples of Isolation Levels.
-40. [Graph_Database.sql](40_Graph_Database.sql) - Graph Database features exmaples.
-41. [Temporal_Tables.sql](41_Temporal_tables.sql) - Temporal Tables examples.
+39. [Isolation_Levels.sql](39_Isolation_Levels.sql) - Advanced examples of Isolation Levels.
+40. [Graph_Database.sql](40_Graph_Database.sql) - Graph Database features examples.
+41. [Temporal_Tables.sql](41_Temporal_Tables.sql) - Temporal Tables examples.
 42. [Partitioning.sql](42_Partitioning.sql) - Table/Index Partitioning examples.
+43. [SET.md](33_SET.md) - Examples of SET options and statements.
+44. [Always_Encrypted.sql](44_Always_Encrypted.sql) - Working with Always Encrypted feature.
+45. [Memory_Optimized_Tables.sql](45_Memory_Optimized_Tables.sql) - Memory-optimized tables examples.
+46. [Extended_Events.sql](46_Extended_Events.sql) - Extended Events monitoring and troubleshooting.
+47. [In_Memory_OLTP.sql](47_In_Memory_OLTP.sql) - In-Memory OLTP features and usage.
+48. [Query_Store.sql](48_Query_Store.sql) - Working with Query Store for performance insights.
+49. [Spatial_Data.sql](49_Spatial_Data.sql) - Working with spatial data types and queries.
+50. [Ledger.sql](50_Ledger.sql) - SQL Server Ledger for immutable data storage.
+51. [Replication_Basics.sql](51_Replication_Basics.sql) - Database replication setup and management.
+
 ### New samples and scripts will be added soon.
