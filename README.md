@@ -55,5 +55,8 @@ This repository contains various SQL scripts and examples for learning SQL Serve
 49. [Spatial_Data.sql](49_Spatial_Data.sql) - Working with spatial data types and queries.
 50. [Ledger.sql](50_Ledger.sql) - SQL Server Ledger for immutable data storage.
 51. [Replication_Basics.sql](51_Replication_Basics.sql) - Database replication setup and management.
+52. [OpenRowSet.sql](52_OpenRowSet.sql) - Using OPENROWSET for querying external data sources.
+53. [Bulk_Insert.sql](53_Bulk_Insert.sql) - Bulk insert operations for efficient data loading.
+54. [CLR.sql](54_CLR.sql) - SQL Server CLR Integration for .NET code execution.
 
 ### New samples and scripts will be added soon.
