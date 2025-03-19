@@ -1,6 +1,5 @@
-# SQL Server Course
+# SQL Server 2022 Course
 
-This repository contains various SQL scripts and examples for learning SQL Server. Below is an index of the files along with a short description of each.
 
 ## Index
 
