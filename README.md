@@ -57,5 +57,5 @@
 52. [OpenRowSet.sql](52_OpenRowSet.sql) - Using OPENROWSET for querying external data sources.
 53. [Bulk_Insert.sql](53_Bulk_Insert.sql) - Bulk insert operations for efficient data loading.
 54. [CLR.sql](54_CLR.sql) - SQL Server CLR Integration for .NET code execution.
-
+55. [Localization.sql](55_Localization.sql) SQL Server 2022 Localization and Globalization.
 ### New samples and scripts will be added soon.
